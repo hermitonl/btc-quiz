@@ -95,10 +95,12 @@ function createRoboNPC(world: World, position: Vector3): Entity | null {
         // modelUri: 'assets/models/players/player.gltf', // Use player model for testing
         // modelLoopedAnimations: ['idle'], // Assuming skeleton has an 'idle' animation
         // modelScale: 0.5, // Adjust scale as needed
-        // modelUri: null, // Cannot be null
-        // Using a placeholder block texture instead of a model URI
-        blockTextureUri: 'textures/blocks/stone.png', // Example placeholder texture
-        blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }, // Required for block entities
+        // Reverting to modelUri based on example code path structure
+        modelUri: 'models/npcs/skeleton.gltf', // Path relative to assets root
+        modelLoopedAnimations: ['idle'], // Add back animation
+        modelScale: 0.5, // Add back scale
+        // blockTextureUri: 'textures/blocks/stone.png', // Remove block texture
+        // blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }, // Remove block extents
         // Removed colliders and rigidBody again as they cause errors
     });
 
@@ -199,13 +201,14 @@ startServer(world => {
       player,
       name: 'Player',
       // Using default player model, ideally replace with a robot model
-      // modelUri: '/app/assets/models/players/player.gltf', // Removed due to loading errors
-      // modelLoopedAnimations: ['idle'], // Not applicable for block textures
-      // modelScale: 0.5, // Not applicable for block textures
-      // Configure PlayerEntity as a block to avoid model loading issues
-      blockTextureUri: 'textures/blocks/bricks.png', // Use a different texture for player
-      blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }, // Standard block size
-      // Note: Default PlayerEntity collider/rigidbody should still apply
+      // Reverting PlayerEntity back to block texture due to persistent model loading errors
+      // Reverting to modelUri based on example code path structure
+      modelUri: 'models/players/player.gltf', // Path relative to assets root
+      modelLoopedAnimations: ['idle'], // Add back animation
+      modelScale: 0.5, // Add back scale
+      // blockTextureUri: 'textures/blocks/bricks.png', // Remove block texture
+      // blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }, // Remove block extents
+      // Collider/RigidBody are usually default for PlayerEntity, no need to specify unless overriding
     });
 
     // Spawn the player entity first
