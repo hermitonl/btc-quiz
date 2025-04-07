@@ -91,10 +91,14 @@ function createRoboNPC(world: World, position: Vector3): Entity | null {
     // Create Entity with options only
     const npcEntity = new Entity({
         name: 'RoboNPC',
-        // Using skeleton as placeholder for robotic appearance
-        modelUri: 'assets/models/npcs/skeleton.gltf',
-        modelLoopedAnimations: ['idle'], // Assuming skeleton has an 'idle' animation
-        modelScale: 0.5, // Adjust scale as needed
+        // Using skeleton as placeholder for robotic appearance - REMOVED due to errors
+        // modelUri: 'assets/models/players/player.gltf', // Use player model for testing
+        // modelLoopedAnimations: ['idle'], // Assuming skeleton has an 'idle' animation
+        // modelScale: 0.5, // Adjust scale as needed
+        // modelUri: null, // Cannot be null
+        // Using a placeholder block texture instead of a model URI
+        blockTextureUri: 'textures/blocks/stone.png', // Example placeholder texture
+        blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }, // Required for block entities
         // Removed colliders and rigidBody again as they cause errors
     });
 
@@ -195,24 +199,31 @@ startServer(world => {
       player,
       name: 'Player',
       // Using default player model, ideally replace with a robot model
-      modelUri: 'assets/models/players/player.gltf',
-      modelLoopedAnimations: ['idle'],
-      modelScale: 0.5,
-      // Collider/RigidBody are usually default for PlayerEntity, no need to specify unless overriding
+      // modelUri: '/app/assets/models/players/player.gltf', // Removed due to loading errors
+      // modelLoopedAnimations: ['idle'], // Not applicable for block textures
+      // modelScale: 0.5, // Not applicable for block textures
+      // Configure PlayerEntity as a block to avoid model loading issues
+      blockTextureUri: 'textures/blocks/bricks.png', // Use a different texture for player
+      blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }, // Standard block size
+      // Note: Default PlayerEntity collider/rigidbody should still apply
     });
 
-    // Initialize player state in the map
+    // Spawn the player entity first
+    playerEntity.spawn(world, new Vector3(0, 10, 0)); // Use new Vector3
+
+    // Initialize player state AFTER spawning, checking for ID
     if (playerEntity.id === undefined) {
-        console.error(`Player entity for ${player.username} has no ID. Cannot track state.`);
-        playerEntity.despawn(); // Despawn invalid entity
+        // If ID is still undefined after spawn, something is wrong. Log and exit for this player.
+        console.error(`Player entity for ${player.username} still has no ID after spawn. Cannot track state.`);
+        // Do NOT call despawn here as it might not be valid if spawn failed internally
         return; // Stop processing this player
     }
     const playerInitialState = { health: PLAYER_MAX_HEALTH, isDead: false, type: 'player' as const };
-    entityState.set(playerEntity.id, playerInitialState);
+    entityState.set(playerEntity.id, playerInitialState); // Use the now-defined ID
     const playerSpecificInitialState = { checkDeathIntervalId: null as NodeJS.Timeout | null }; // Explicitly type null
-    playerState.set(playerEntity.id, playerSpecificInitialState);
+    playerState.set(playerEntity.id, playerSpecificInitialState); // Use the now-defined ID
 
-    playerEntity.spawn(world, new Vector3(0, 10, 0)); // Use new Vector3
+    // Player already spawned above
 
     player.ui.load('ui/index.html');
 
