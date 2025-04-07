@@ -7,8 +7,7 @@ import {
   Vector3,    // Import Vector3 for positions/directions
   World,      // Import World type for function signatures
   Player,     // Import Player type
-  // EntityEvent // Removed as specific events like DESPAWN seem unavailable/unused here
-  // Keys enum doesn't seem to exist, will use string literals ('f')
+  EntityEvent // Import EntityEvent
 } from 'hytopia';
 
 import worldMap from './assets/map.json';
@@ -16,26 +15,26 @@ import worldMap from './assets/map.json';
 // --- Configuration ---
 const PLAYER_MAX_HEALTH = 100;
 const NPC_MAX_HEALTH = 50;
-const PLAYER_ATTACK_DAMAGE = 10;
-const NPC_ATTACK_DAMAGE = 5;
+const PLAYER_ATTACK_DAMAGE = 10; // Player deals damage by colliding
+const NPC_ATTACK_DAMAGE = 2; // NPC deals damage by colliding
 const ATTACK_RANGE = 3; // Max distance for attacks
-const NPC_ATTACK_INTERVAL = 2000; // Milliseconds
+const NPC_ATTACK_INTERVAL = 5000; // Milliseconds between attacks (for both player and NPC)
+const PLAYER_ATTACK_COOLDOWN = 1000; // Cooldown for player attacks via collision
 
 // --- State Management ---
 // Using Maps to store custom state associated with entity IDs
 const entityState = new Map<number, { health: number; isDead: boolean; type: 'player' | 'npc' }>(); // Key is entity.id (number)
-const npcState = new Map<number, { lastAttackTime: number; attackIntervalId: NodeJS.Timeout | null }>(); // Key is entity.id (number)
-const playerState = new Map<number, { checkDeathIntervalId: NodeJS.Timeout | null }>(); // Key is playerEntity.id (number)
+const npcState = new Map<number, { lastAttackTime: number; lastDamageTime: number; attackIntervalId: NodeJS.Timeout | null }>(); // Key is entity.id (number)
+const playerState = new Map<number, { checkDeathIntervalId: NodeJS.Timeout | null; lastAttackTime: number; }>(); // Key is playerEntity.id (number)
 
 // --- Helper Function ---
 function applyDamage(target: Entity, damage: number, world: World) {
   if (target.id === undefined) return; // Guard against undefined ID
   const state = entityState.get(target.id);
-  if (!state) {
-    console.warn(`Entity ${target.id} has no state tracked.`);
+  if (!state || state.isDead) { // Don't damage dead entities or entities without state
+    // console.warn(`Entity ${target.id} has no state tracked or is dead.`); // Optional logging
     return;
   }
-  if (state.isDead) return; // Don't damage dead entities
 
   state.health -= damage;
   console.log(`Entity ${target.id} (${state.type}) took ${damage} damage. Health: ${state.health}`);
@@ -71,15 +70,16 @@ function applyDamage(target: Entity, damage: number, world: World) {
     // Optional: Play death animation/sound
     // target.playAnimationOnce('death_animation'); // Example
     // Despawn after a delay
+    const targetId = target.id; // Capture ID before setTimeout
     setTimeout(() => {
       if (target.world) { // Check if still in world
          target.despawn(); // Despawn the entity
-         console.log(`Entity ${target.id} despawned after dying.`);
+         console.log(`Entity ${targetId} despawned after dying.`); // Use captured ID
          // Remove state from maps after despawn
-         if (target.id !== undefined) { // Guard
-             entityState.delete(target.id);
-             if (state.type === 'npc') npcState.delete(target.id);
-             if (state.type === 'player') playerState.delete(target.id); // Use target.id here too
+         if (targetId !== undefined) { // Guard with captured ID
+             entityState.delete(targetId);
+             if (state.type === 'npc') npcState.delete(targetId);
+             if (state.type === 'player') playerState.delete(targetId); // Use captured ID here too
          }
       }
     }, 3000); // Despawn after 3 seconds
@@ -106,8 +106,6 @@ function createRoboNPC(world: World, position: Vector3): Entity | null {
     // Spawn the entity in the world
     npcEntity.spawn(world, position);
 
-    // Removed post-spawn collider/rigidbody setting attempts
-
     // Initialize and store state
     // Check if entity creation failed or ID is missing
     if (!npcEntity || npcEntity.id === undefined) {
@@ -115,120 +113,86 @@ function createRoboNPC(world: World, position: Vector3): Entity | null {
         return null;
     }
 
-    // Initialize and store state using the number ID
+    const npcId = npcEntity.id; // Capture ID for use in closures
     const state = { health: NPC_MAX_HEALTH, isDead: false, type: 'npc' as const };
-    entityState.set(npcEntity.id, state);
-    const npcSpecificState = { lastAttackTime: 0, attackIntervalId: null as NodeJS.Timeout | null }; // Explicitly type null
-    npcState.set(npcEntity.id, npcSpecificState);
+    entityState.set(npcId, state);
+    const npcSpecificState = { lastAttackTime: 0, lastDamageTime: 0, attackIntervalId: null as NodeJS.Timeout | null }; // Added lastDamageTime
+    npcState.set(npcId, npcSpecificState);
 
-    console.log(`RoboNPC ${npcEntity.id} spawned at ${position.x}, ${position.y}, ${position.z} with ${state.health} HP.`);
+    console.log(`RoboNPC ${npcId} spawned at ${position.x}, ${position.y}, ${position.z} with ${state.health} HP.`);
 
-    // Start AI loop only after spawning and state initialization
-    // Assign interval ID correctly
-    const intervalId: NodeJS.Timeout = setInterval(() => {
-        aiTick(npcEntity, world); // Pass entity and world to AI tick
-    }, 500); // Check for players every 500ms
-    npcSpecificState.attackIntervalId = intervalId;
-
-
-    // Removed npcEntity.on('despawn', ...) as the event name is likely incorrect.
-    // Cleanup is handled in applyDamage and LEFT_WORLD.
-
-
-    return npcEntity;
-}
-
-// AI logic as a standalone function
-function aiTick(npcEntity: Entity, world: World): void {
-    if (npcEntity.id === undefined) return; // Guard
-    const state = entityState.get(npcEntity.id);
-    const npcSpecificState = npcState.get(npcEntity.id);
-
-    // Stop if dead, despawned, or state is missing
-    if (!state || state.isDead || !npcEntity.world || !npcSpecificState) {
-        if (npcSpecificState?.attackIntervalId) {
-             clearInterval(npcSpecificState.attackIntervalId);
-             npcSpecificState.attackIntervalId = null;
+    // --- NPC AI Logic (AI Tick) ---
+    const aiTick = () => {
+        if (!npcEntity.world || state.isDead) { // Stop if despawned or dead
+            if (npcSpecificState.attackIntervalId) {
+                clearInterval(npcSpecificState.attackIntervalId);
+                npcSpecificState.attackIntervalId = null;
+            }
+            return;
         }
-        return;
-    }
 
-    // Find nearby players manually
-    const nearbyPlayers: PlayerEntity[] = [];
-    const allPlayers = world.entityManager.getAllPlayerEntities(); // Use getAllPlayerEntities
-    for (const playerEntity of allPlayers) {
-        if (playerEntity.id === undefined) continue; // Guard
-        const playerStateCheck = entityState.get(playerEntity.id); // Use playerEntity.id
-        if (playerStateCheck && !playerStateCheck.isDead) { // Check if player is alive
-            // Manual Euclidean distance calculation
-            const dx = npcEntity.position.x - playerEntity.position.x;
-            const dy = npcEntity.position.y - playerEntity.position.y;
-            const dz = npcEntity.position.z - playerEntity.position.z;
-            const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            if (distance <= ATTACK_RANGE) {
-                nearbyPlayers.push(playerEntity);
+        // Find nearby players
+        const nearbyPlayers: PlayerEntity[] = [];
+        const allPlayers = world.entityManager.getAllPlayerEntities(); // Use getAllPlayerEntities
+        for (const playerEntity of allPlayers) {
+            if (playerEntity.id === undefined) continue; // Guard
+            const playerStateCheck = entityState.get(playerEntity.id); // Use playerEntity.id
+            if (playerStateCheck && !playerStateCheck.isDead) { // Check if player is alive
+                const dx = npcEntity.position.x - playerEntity.position.x;
+                const dy = npcEntity.position.y - playerEntity.position.y;
+                const dz = npcEntity.position.z - playerEntity.position.z;
+                const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                if (distance <= ATTACK_RANGE) {
+                    nearbyPlayers.push(playerEntity);
+                }
             }
         }
-    }
 
-    // Attack the first nearby player found
-    if (nearbyPlayers.length > 0 && Date.now() - npcSpecificState.lastAttackTime > NPC_ATTACK_INTERVAL) {
-        const targetPlayerEntity = nearbyPlayers[0];
-        if (targetPlayerEntity) { // Check if target exists
-            console.log(`NPC ${npcEntity.id} attacking Player ${targetPlayerEntity.id}`);
-            applyDamage(targetPlayerEntity, NPC_ATTACK_DAMAGE, world);
+        // Attack the first nearby player found if cooldown allows
+        if (nearbyPlayers.length > 0 && Date.now() - npcSpecificState.lastAttackTime > NPC_ATTACK_INTERVAL) {
+            const targetPlayerEntity = nearbyPlayers[0];
+            if (targetPlayerEntity) { // Check if target exists
+                console.log(`NPC ${npcId} attacking Player ${targetPlayerEntity.id}`);
+                applyDamage(targetPlayerEntity, NPC_ATTACK_DAMAGE, world);
+                npcSpecificState.lastAttackTime = Date.now(); // Update last attack time
+                // Optional: Play attack animation/sound
+                // npcEntity.playAnimationOnce('attack');
+            }
         }
-        npcSpecificState.lastAttackTime = Date.now();
-        // Optional: Play attack animation/sound
-        // npcEntity.playAnimationOnce('attack');
-    }
-}
+    };
 
-// --- Player Attack Logic (Global Scope) ---
-// Function to handle the attack action, now accepts the player entity
-// Defined *before* startServer so it's in scope for the global listener
-function handlePlayerAttack(playerEntity: PlayerEntity, world: World): void {
-  if (playerEntity.id === undefined) return; // Guard
-  const currentPlayerState = entityState.get(playerEntity.id);
-  // Can't attack if dead, despawned, or state is missing
-  if (!currentPlayerState || currentPlayerState.isDead || !playerEntity.world) {
-      world.chatManager.sendPlayerMessage(playerEntity.player, "You cannot attack right now.", "FF0000");
-      return;
-  }
+    // Start AI loop
+    npcSpecificState.attackIntervalId = setInterval(aiTick, 500); // Check every 500ms
 
-  console.log(`Player ${playerEntity.player.username} initiated attack (via action press)`);
+    // --- NPC Collision Logic ---
+    // Assuming EntityEvent.COLLISION exists and provides { entity: Entity, otherEntity: Entity }
+    npcEntity.on(EntityEvent.COLLISION, ({ entity, otherEntity }) => {
+        // Check if the collision is between the NPC and a PlayerEntity
+        // Ensure both entities exist and the NPC is alive
+        if (entity === npcEntity && otherEntity instanceof PlayerEntity && !state.isDead) {
+            const now = Date.now();
+            // Check cooldown for player attacking NPC
+            if (now - npcSpecificState.lastDamageTime > PLAYER_ATTACK_COOLDOWN) { // Use PLAYER_ATTACK_COOLDOWN
+                console.log(`Player ${otherEntity.id} collided with NPC ${npcEntity.id}`);
+                applyDamage(npcEntity, PLAYER_ATTACK_DAMAGE, world); // Apply damage to NPC
+                npcSpecificState.lastDamageTime = now; // Update last damage time
+            }
+        } else if (entity instanceof PlayerEntity && otherEntity === npcEntity && !state.isDead) {
+            // Handle the case where the event might be triggered on the player instead
+            const now = Date.now();
+            // Check cooldown for player attacking NPC
+            if (now - npcSpecificState.lastDamageTime > PLAYER_ATTACK_COOLDOWN) { // Use PLAYER_ATTACK_COOLDOWN
+                console.log(`Player ${entity.id} collided with NPC ${npcEntity.id}`);
+                applyDamage(npcEntity, PLAYER_ATTACK_DAMAGE, world); // Apply damage to NPC
+                npcSpecificState.lastDamageTime = now; // Update last damage time
+            }
+        }
+    });
 
-  // Find nearby NPCs manually
-  let targetNPC: Entity | null = null;
-  const allEntities = world.entityManager.getAllEntities(); // Use getAllEntities
-  for (const entity of allEntities) {
-      // Check if it's an NPC (by name or tag if we used tags) and alive
-      if (entity.id === undefined) continue; // Guard
-      const npcStateCheck = entityState.get(entity.id);
-      if (entity.name === 'RoboNPC' && npcStateCheck && !npcStateCheck.isDead) {
-           // Manual Euclidean distance calculation
-           const dx = playerEntity.position.x - entity.position.x;
-           const dy = playerEntity.position.y - entity.position.y;
-           const dz = playerEntity.position.z - entity.position.z;
-           const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-           if (distance <= ATTACK_RANGE) {
-               targetNPC = entity;
-               break; // Attack the first one found
-           }
-      }
-  }
+    // --- NPC Despawn Logic ---
+    // Removed npcEntity.on('despawn', ...) as cleanup is handled in applyDamage
 
-  if (targetNPC) {
-    console.log(`Player ${playerEntity.player.username} attacking NPC ${targetNPC.id}`);
-    world.chatManager.sendPlayerMessage(playerEntity.player, `Attacking RoboNPC ${targetNPC.id}!`, "FFFF00");
-    applyDamage(targetNPC, PLAYER_ATTACK_DAMAGE, world);
-    // Optional: Play player attack animation/sound
-    // playerEntity.playAnimationOnce('attack');
-  } else {
-    console.log(`Player ${playerEntity.player.username} attacked, but no NPCs in range.`);
-    world.chatManager.sendPlayerMessage(playerEntity.player, "No NPCs in range to attack.", "FFFF00");
-    // Optional: Play swing/miss sound
-  }
+    return npcEntity;
 }
 
 // --- Server Start ---
@@ -268,7 +232,7 @@ startServer(world => {
     }
     const playerInitialState = { health: PLAYER_MAX_HEALTH, isDead: false, type: 'player' as const };
     entityState.set(playerEntity.id, playerInitialState); // Use the now-defined ID
-    const playerSpecificState = { checkDeathIntervalId: null as NodeJS.Timeout | null }; // Explicitly type null
+    const playerSpecificState = { checkDeathIntervalId: null as NodeJS.Timeout | null, lastAttackTime: 0 }; // Added lastAttackTime
     playerState.set(playerEntity.id, playerSpecificState); // Use the now-defined ID
 
     // Player already spawned above
@@ -276,14 +240,9 @@ startServer(world => {
     player.ui.load('ui/index.html');
 
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Robo-Game!', '00FF00');
-    world.chatManager.sendPlayerMessage(player, 'Use WASD to move, Space to jump, Shift to sprint.');
-    // world.chatManager.sendPlayerMessage(player, 'Type /attack to attack nearby RoboNPCs.'); // Removed command hint
-    world.chatManager.sendPlayerMessage(player, 'Press F to attack nearby RoboNPCs.'); // Added key hint
+    world.chatManager.sendPlayerMessage(player, 'Bump into NPCs to attack them!'); // Updated hint
     world.chatManager.sendPlayerMessage(player, `Your HP: ${playerInitialState.health}/${PLAYER_MAX_HEALTH}`);
     // world.chatManager.sendPlayerMessage(player, 'Press \\ to enter or exit debug view.'); // Keep if needed
-
-    // Attack command logic removed, handled by global listener now
-
 
     // --- Player Death/Respawn Logic ---
     // Simple check interval for player death to trigger respawn message
@@ -350,21 +309,7 @@ startServer(world => {
   }); // END JOINED_WORLD
 
   // --- Global Event Listeners ---
-  // Register the attack action listener globally
-  // Assuming PlayerEvent.ACTION_PRESSED exists and provides { player: Player }
-  // const attackKeyListener = (payload: { player: Player }) => {
-  //     const eventPlayer = payload.player;
-  // 
-  //     // Find the player entity associated with the player ID
-  //     // Use find on getAllEntities as getPlayerEntity doesn't seem to exist
-  //     const playerEntity = world.entityManager.getAllEntities().find(entity => entity instanceof PlayerEntity && entity.player === eventPlayer) as PlayerEntity | undefined;
-  // 
-  //     // Check if player entity exists and the key is 'f' (or another desired key)
-  //     if (playerEntity && keyPressed.toLowerCase() === 'f') {
-  //         handlePlayerAttack(playerEntity, world); // Pass the player entity and world
-  //     }
-  // };
-  // world.on(PlayerEvent.PRESSED_KEY, attackKeyListener); // Removed due to errors
+  // Removed global attack listener
 
   // --- Player Leave Logic (Main Handler) ---
   // This part just handles the despawning of entities.
@@ -396,11 +341,10 @@ startServer(world => {
 
   // --- Ambient Audio ---
   new Audio({
-    uri: 'audio/music/hytopia-main.mp3', // Maybe change to a more robotic theme later?
+    uri: 'assets/audio/music/hytopia-main.mp3', // Maybe change to a more robotic theme later?
     loop: true,
     volume: 0.1,
   }).play(world);
 
   console.log("Robo-Game server initialized.");
 }); // END startServer
-// Removed the final console.log outside the startServer scope
