@@ -1,140 +1,376 @@
-/**
- * HYTOPIA SDK Boilerplate
- * 
- * This is a simple boilerplate to get started on your project.
- * It implements the bare minimum to be able to run and connect
- * to your game server and run around as the basic player entity.
- * 
- * From here you can begin to implement your own game logic
- * or do whatever you want!
- * 
- * You can find documentation here: https://github.com/hytopiagg/sdk/blob/main/docs/server.md
- * 
- * For more in-depth examples, check out the examples folder in the SDK, or you
- * can find it directly on GitHub: https://github.com/hytopiagg/sdk/tree/main/examples/payload-game
- * 
- * You can officially report bugs or request features here: https://github.com/hytopiagg/sdk/issues
- * 
- * To get help, have found a bug, or want to chat with
- * other HYTOPIA devs, join our Discord server:
- * https://discord.gg/DXCXJbHSJX
- * 
- * Official SDK Github repo: https://github.com/hytopiagg/sdk
- * Official SDK NPM Package: https://www.npmjs.com/package/hytopia
- */
-
 import {
   startServer,
   Audio,
   PlayerEntity,
   PlayerEvent,
+  Entity,     // Use standard Entity for NPC
+  Vector3,    // Import Vector3 for positions/directions
+  World,      // Import World type for function signatures
+  Player,     // Import Player type
+  // EntityEvent // Removed as specific events like DESPAWN seem unavailable/unused here
+  // Keys enum doesn't seem to exist, will use string literals ('f')
 } from 'hytopia';
 
 import worldMap from './assets/map.json';
 
-/**
- * startServer is always the entry point for our game.
- * It accepts a single function where we should do any
- * setup necessary for our game. The init function is
- * passed a World instance which is the default
- * world created by the game server on startup.
- * 
- * Documentation: https://github.com/hytopiagg/sdk/blob/main/docs/server.startserver.md
- */
+// --- Configuration ---
+const PLAYER_MAX_HEALTH = 100;
+const NPC_MAX_HEALTH = 50;
+const PLAYER_ATTACK_DAMAGE = 10;
+const NPC_ATTACK_DAMAGE = 5;
+const ATTACK_RANGE = 3; // Max distance for attacks
+const NPC_ATTACK_INTERVAL = 2000; // Milliseconds
 
+// --- State Management ---
+// Using Maps to store custom state associated with entity IDs
+const entityState = new Map<number, { health: number; isDead: boolean; type: 'player' | 'npc' }>(); // Key is entity.id (number)
+const npcState = new Map<number, { lastAttackTime: number; attackIntervalId: NodeJS.Timeout | null }>(); // Key is entity.id (number)
+const playerState = new Map<number, { checkDeathIntervalId: NodeJS.Timeout | null }>(); // Key is entity.id (number)
+
+// --- Helper Function ---
+function applyDamage(target: Entity, damage: number, world: World) {
+  if (target.id === undefined) return; // Guard against undefined ID
+  const state = entityState.get(target.id);
+  if (!state) {
+    console.warn(`Entity ${target.id} has no state tracked.`);
+    return;
+  }
+  if (state.isDead) return; // Don't damage dead entities
+
+  state.health -= damage;
+  console.log(`Entity ${target.id} (${state.type}) took ${damage} damage. Health: ${state.health}`);
+
+  // Optional: Add visual/audio feedback for damage
+  // target.playAnimationOnce('damage_animation'); // Example
+  // new Audio({ uri: 'audio/sfx/damage/hit.mp3' }).playAt(target.position, world); // Example
+
+  if (state.health <= 0) {
+    state.health = 0;
+    state.isDead = true;
+    console.log(`Entity ${target.id} (${state.type}) has died.`);
+
+    // Clean up specific intervals if they exist
+    if (state.type === 'npc') {
+        if (target.id === undefined) return; // Guard
+        const npcSpecificState = npcState.get(target.id);
+        if (npcSpecificState?.attackIntervalId) {
+            clearInterval(npcSpecificState.attackIntervalId);
+            npcSpecificState.attackIntervalId = null; // Prevent further AI ticks
+        }
+    } else if (state.type === 'player') {
+        if (target.id === undefined) return; // Guard
+        const playerSpecificState = playerState.get(target.id);
+        if (playerSpecificState?.checkDeathIntervalId) {
+            clearInterval(playerSpecificState.checkDeathIntervalId); // Stop the death check loop
+        }
+        // Note: Player input listeners are cleaned up on leave event
+    }
+
+
+    // Optional: Play death animation/sound
+    // target.playAnimationOnce('death_animation'); // Example
+    // Despawn after a delay
+    setTimeout(() => {
+      if (target.world) { // Check if still in world
+         target.despawn(); // Despawn the entity
+         console.log(`Entity ${target.id} despawned after dying.`);
+         // Remove state from maps after despawn
+         if (target.id !== undefined) { // Guard
+             entityState.delete(target.id);
+             if (state.type === 'npc') npcState.delete(target.id);
+             if (state.type === 'player') playerState.delete(target.id);
+         }
+      }
+    }, 3000); // Despawn after 3 seconds
+  }
+}
+
+// --- NPC Management ---
+function createRoboNPC(world: World, position: Vector3): Entity | null {
+    // Create Entity with world and options
+    // Create Entity with options only
+    const npcEntity = new Entity({
+        name: 'RoboNPC',
+        // Using skeleton as placeholder for robotic appearance
+        modelUri: 'assets/models/npcs/skeleton.gltf',
+        modelLoopedAnimations: ['idle'], // Assuming skeleton has an 'idle' animation
+        modelScale: 0.5, // Adjust scale as needed
+        // Removed colliders and rigidBody again as they cause errors
+    });
+
+    // Spawn the entity in the world
+    npcEntity.spawn(world, position);
+
+    // Removed post-spawn collider/rigidbody setting attempts
+
+    // Initialize and store state
+    // Check if entity creation failed or ID is missing
+    if (!npcEntity || npcEntity.id === undefined) {
+        console.error("Failed to create NPC entity or entity has no ID.");
+        return null;
+    }
+
+    // Initialize and store state using the number ID
+    const state = { health: NPC_MAX_HEALTH, isDead: false, type: 'npc' as const };
+    entityState.set(npcEntity.id, state);
+    const npcSpecificState = { lastAttackTime: 0, attackIntervalId: null as NodeJS.Timeout | null }; // Explicitly type null
+    npcState.set(npcEntity.id, npcSpecificState);
+
+    console.log(`RoboNPC ${npcEntity.id} spawned at ${position.x}, ${position.y}, ${position.z} with ${state.health} HP.`);
+
+    // Start AI loop only after spawning and state initialization
+    // Assign interval ID correctly
+    const intervalId: NodeJS.Timeout = setInterval(() => {
+        aiTick(npcEntity, world); // Pass entity and world to AI tick
+    }, 500); // Check for players every 500ms
+    npcSpecificState.attackIntervalId = intervalId;
+
+
+    // Removed npcEntity.on('despawn', ...) as the event name is likely incorrect.
+    // Cleanup is handled in applyDamage and LEFT_WORLD.
+
+
+    return npcEntity;
+}
+
+// AI logic as a standalone function
+function aiTick(npcEntity: Entity, world: World): void {
+    if (npcEntity.id === undefined) return; // Guard
+    const state = entityState.get(npcEntity.id);
+    const npcSpecificState = npcState.get(npcEntity.id);
+
+    // Stop if dead, despawned, or state is missing
+    if (!state || state.isDead || !npcEntity.world || !npcSpecificState) {
+        if (npcSpecificState?.attackIntervalId) {
+             clearInterval(npcSpecificState.attackIntervalId);
+             npcSpecificState.attackIntervalId = null;
+        }
+        return;
+    }
+
+    // Find nearby players manually
+    const nearbyPlayers: PlayerEntity[] = [];
+    const allPlayers = world.entityManager.getAllPlayerEntities(); // Use getAllPlayerEntities
+    for (const playerEntity of allPlayers) {
+        if (playerEntity.id === undefined) continue; // Guard
+        const playerState = entityState.get(playerEntity.id);
+        if (playerState && !playerState.isDead) { // Check if player is alive
+            // Manual Euclidean distance calculation
+            const dx = npcEntity.position.x - playerEntity.position.x;
+            const dy = npcEntity.position.y - playerEntity.position.y;
+            const dz = npcEntity.position.z - playerEntity.position.z;
+            const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            if (distance <= ATTACK_RANGE) {
+                nearbyPlayers.push(playerEntity);
+            }
+        }
+    }
+
+
+    if (nearbyPlayers.length > 0 && Date.now() - npcSpecificState.lastAttackTime > NPC_ATTACK_INTERVAL) {
+        const targetPlayerEntity = nearbyPlayers[0]; // Attack the first one found
+        if (targetPlayerEntity) { // Check if target exists
+            console.log(`NPC ${npcEntity.id} attacking Player ${targetPlayerEntity.id}`);
+            applyDamage(targetPlayerEntity, NPC_ATTACK_DAMAGE, world);
+        }
+        npcSpecificState.lastAttackTime = Date.now();
+        // Optional: Play attack animation/sound
+        // npcEntity.playAnimationOnce('attack');
+    }
+}
+
+
+// --- Server Start ---
 startServer(world => {
-  /**
-   * Enable debug rendering of the physics simulation.
-   * This will overlay lines in-game representing colliders,
-   * rigid bodies, and raycasts. This is useful for debugging
-   * physics-related issues in a development environment.
-   * Enabling this can cause performance issues, which will
-   * be noticed as dropped frame rates and higher RTT times.
-   * It is intended for development environments only and
-   * debugging physics.
-   */
-  
-  // world.simulation.enableDebugRendering(true);
+  // world.simulation.enableDebugRendering(true); // Keep commented out unless debugging physics
 
-  /**
-   * Load our map.
-   * You can build your own map using https://build.hytopia.com
-   * After building, hit export and drop the .json file in
-   * the assets folder as map.json.
-   */
   world.loadMap(worldMap);
 
-  /**
-   * Handle player joining the game. The PlayerEvent.JOINED_WORLD
-   * event is emitted to the world when a new player connects to
-   * the game. From here, we create a basic player
-   * entity instance which automatically handles mapping
-   * their inputs to control their in-game entity and
-   * internally uses our player entity controller.
-   * 
-   * The HYTOPIA SDK is heavily driven by events, you
-   * can find documentation on how the event system works,
-   * here: https://dev.hytopia.com/sdk-guides/events
-   */
+  // Spawn one NPC initially using the factory function
+  createRoboNPC(world, new Vector3(5, 5, 5)); // Use new Vector3
+
+  // --- Player Join Logic ---
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
     const playerEntity = new PlayerEntity({
       player,
       name: 'Player',
-      modelUri: 'models/players/player.gltf',
-      modelLoopedAnimations: [ 'idle' ],
+      // Using default player model, ideally replace with a robot model
+      modelUri: 'assets/models/players/player.gltf',
+      modelLoopedAnimations: ['idle'],
       modelScale: 0.5,
+      // Collider/RigidBody are usually default for PlayerEntity, no need to specify unless overriding
     });
-  
-    playerEntity.spawn(world, { x: 0, y: 10, z: 0 });
 
-    // Load our game UI for this player
+    // Initialize player state in the map
+    if (playerEntity.id === undefined) {
+        console.error(`Player entity for ${player.username} has no ID. Cannot track state.`);
+        playerEntity.despawn(); // Despawn invalid entity
+        return; // Stop processing this player
+    }
+    const playerInitialState = { health: PLAYER_MAX_HEALTH, isDead: false, type: 'player' as const };
+    entityState.set(playerEntity.id, playerInitialState);
+    const playerSpecificInitialState = { checkDeathIntervalId: null as NodeJS.Timeout | null }; // Explicitly type null
+    playerState.set(playerEntity.id, playerSpecificInitialState);
+
+    playerEntity.spawn(world, new Vector3(0, 10, 0)); // Use new Vector3
+
     player.ui.load('ui/index.html');
 
-    // Send a nice welcome message that only the player who joined will see ;)
-    world.chatManager.sendPlayerMessage(player, 'Welcome to the game!', '00FF00');
-    world.chatManager.sendPlayerMessage(player, 'Use WASD to move around.');
-    world.chatManager.sendPlayerMessage(player, 'Press space to jump.');
-    world.chatManager.sendPlayerMessage(player, 'Hold shift to sprint.');
-    world.chatManager.sendPlayerMessage(player, 'Press \\ to enter or exit debug view.');
+    world.chatManager.sendPlayerMessage(player, 'Welcome to the Robo-Game!', '00FF00');
+    world.chatManager.sendPlayerMessage(player, 'Use WASD to move, Space to jump, Shift to sprint.');
+    world.chatManager.sendPlayerMessage(player, 'Type /attack to attack nearby RoboNPCs.');
+    world.chatManager.sendPlayerMessage(player, `Your HP: ${playerInitialState.health}/${PLAYER_MAX_HEALTH}`);
+    // world.chatManager.sendPlayerMessage(player, 'Press \\ to enter or exit debug view.'); // Keep if needed
+
+    // --- Player Attack Logic (Command Based) ---
+    // Register an /attack command specific to this player instance
+    const attackCommand = '/attack';
+    const attackCommandHandler = (cmdPlayer: Player) => {
+        // Ensure the command is executed by the correct player
+        if (cmdPlayer.id !== player.id) return;
+
+        if (playerEntity.id === undefined) return; // Guard
+        const currentPlayerState = entityState.get(playerEntity.id);
+        // Can't attack if dead, despawned, or state is missing
+        if (!currentPlayerState || currentPlayerState.isDead || !playerEntity.world) {
+            world.chatManager.sendPlayerMessage(player, "You cannot attack right now.", "FF0000");
+            return;
+        }
+
+        console.log(`Player ${player.username} used /attack`);
+
+        // Find nearby NPCs manually
+        let targetNPC: Entity | null = null;
+        const allEntities = world.entityManager.getAllEntities(); // Use getAllEntities
+        for (const entity of allEntities) {
+            // Check if it's an NPC (by name or tag if we used tags) and alive
+            if (entity.id === undefined) continue; // Guard
+            const npcStateCheck = entityState.get(entity.id);
+            if (entity.name === 'RoboNPC' && npcStateCheck && !npcStateCheck.isDead) {
+                 // Manual Euclidean distance calculation
+                 const dx = playerEntity.position.x - entity.position.x;
+                 const dy = playerEntity.position.y - entity.position.y;
+                 const dz = playerEntity.position.z - entity.position.z;
+                 const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                 if (distance <= ATTACK_RANGE) {
+                     targetNPC = entity;
+                     break; // Attack the first one found
+                 }
+            }
+        }
+
+        if (targetNPC) {
+          console.log(`Player ${player.username} attacking NPC ${targetNPC.id}`);
+          world.chatManager.sendPlayerMessage(player, `Attacking RoboNPC ${targetNPC.id}!`, "FFFF00");
+          applyDamage(targetNPC, PLAYER_ATTACK_DAMAGE, world);
+          // Optional: Play player attack animation/sound
+          // playerEntity.playAnimationOnce('attack');
+        } else {
+          console.log(`Player ${player.username} used /attack, but no NPCs in range.`);
+          world.chatManager.sendPlayerMessage(player, "No NPCs in range to attack.", "FFFF00");
+          // Optional: Play swing/miss sound
+        }
+    };
+    // Register the command handler
+    world.chatManager.registerCommand(attackCommand, attackCommandHandler);
+
+
+    // --- Player Death/Respawn Logic ---
+    // Simple check interval for player death to trigger respawn message
+    // More robust handling might involve events or state machines
+    // Get the specific state for this player to store the interval ID
+    if (playerEntity.id === undefined) return; // Guard added earlier, but double-check
+    const currentPlayerSpecificState = playerState.get(playerEntity.id);
+
+    if (currentPlayerSpecificState) { // Should always exist, but check for safety
+        const deathCheckIntervalId: NodeJS.Timeout = setInterval(() => {
+            if (playerEntity.id === undefined) { // Guard inside interval
+                 clearInterval(deathCheckIntervalId);
+                 return;
+            }
+            const currentState = entityState.get(playerEntity.id); // Get current health state
+
+            if (!playerEntity.world || !currentState) { // Player entity despawned or state removed
+                if (currentPlayerSpecificState.checkDeathIntervalId) {
+                    clearInterval(deathCheckIntervalId); // Use the correct interval ID
+                }
+                return;
+            }
+
+            if (currentState.isDead) {
+                world.chatManager.sendPlayerMessage(player, 'You died! You will despawn shortly.', 'FF0000');
+                if (currentPlayerSpecificState.checkDeathIntervalId) {
+                    clearInterval(deathCheckIntervalId); // Use the correct interval ID
+                }
+                // Despawn is handled by applyDamage timeout
+            } else {
+                 // Optional: Update health display periodically?
+                 // player.ui.call('updateHealth', { current: currentState.health, max: PLAYER_MAX_HEALTH });
+            }
+        }, 1000); // Check every second
+        currentPlayerSpecificState.checkDeathIntervalId = deathCheckIntervalId; // Store the ID
+    }
+
+
+    // --- Cleanup on Player Leave ---
+    // Ensure listeners and intervals are cleaned up when the player leaves
+    // to prevent memory leaks if the player entity instance isn't garbage collected immediately.
+    const leaveListener = ({ player: leavingPlayer }: { player: Player }) => {
+        if (leavingPlayer.id === player.id) {
+            console.log(`Cleaning up resources for player ${player.username} (ID: ${player.id})`);
+            // Unregister the command handler when the player leaves
+            world.chatManager.unregisterCommand(attackCommand); // Unregister by name only
+
+            // Clear the death check interval using the stored ID
+            if (playerEntity.id === undefined) return; // Guard
+            const playerSpecificState = playerState.get(playerEntity.id);
+            if (playerSpecificState?.checkDeathIntervalId) {
+                clearInterval(playerSpecificState.checkDeathIntervalId);
+                playerSpecificState.checkDeathIntervalId = null;
+            }
+            // Note: State maps are cleaned up when entity despawns (either via death or leave)
+            world.off(PlayerEvent.LEFT_WORLD, leaveListener); // Remove this listener itself
+        }
+    };
+    world.on(PlayerEvent.LEFT_WORLD, leaveListener);
+
   });
 
-  /**
-   * Handle player leaving the game. The PlayerEvent.LEFT_WORLD
-   * event is emitted to the world when a player leaves the game.
-   * Because HYTOPIA is not opinionated on join and
-   * leave game logic, we are responsible for cleaning
-   * up the player and any entities associated with them
-   * after they leave. We can easily do this by 
-   * getting all the known PlayerEntity instances for
-   * the player who left by using our world's EntityManager
-   * instance.
-   * 
-   * The HYTOPIA SDK is heavily driven by events, you
-   * can find documentation on how the event system works,
-   * here: https://dev.hytopia.com/sdk-guides/events
-   */
+  // --- Player Leave Logic (Main Handler) ---
+  // This part just handles the despawning of entities.
+  // Specific listener cleanup is handled within the JOINED_WORLD scope now.
   world.on(PlayerEvent.LEFT_WORLD, ({ player }) => {
-    world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => entity.despawn());
-  });
-
-  /**
-   * A silly little easter egg command. When a player types
-   * "/rocket" in the game, they'll get launched into the air!
-   */
-  world.chatManager.registerCommand('/rocket', player => {
-    world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => {
-      entity.applyImpulse({ x: 0, y: 20, z: 0 });
+    // Despawn all entities associated with the player
+    const entitiesToDespawn = world.entityManager.getPlayerEntitiesByPlayer(player);
+    console.log(`Player ${player.username} left. Despawning ${entitiesToDespawn.length} associated entities.`);
+    entitiesToDespawn.forEach(entity => {
+        if (entity.world) {
+             console.log(`Despawning entity ${entity.id} for leaving player ${player.username}`);
+             entity.despawn(); // Despawn triggers state cleanup via 'despawn' event or applyDamage
+        }
     });
   });
 
-  /**
-   * Play some peaceful ambient music to
-   * set the mood!
-   */
-  
+  // --- Commands (Keep or remove as needed) ---
+  world.chatManager.registerCommand('/rocket', player => {
+    world.entityManager.getPlayerEntitiesByPlayer(player).forEach((entity: PlayerEntity) => {
+      if (entity.id === undefined) return; // Guard
+      const state = entityState.get(entity.id);
+      // Don't rocket dead, despawned, or state-missing players
+      if (state && !state.isDead && entity.world) {
+          entity.applyImpulse(new Vector3(0, 20, 0)); // Use new Vector3
+      }
+    });
+  });
+
+  // --- Ambient Audio ---
   new Audio({
-    uri: 'audio/music/hytopia-main.mp3',
+    uri: 'assets/audio/music/hytopia-main.mp3', // Maybe change to a more robotic theme later?
     loop: true,
     volume: 0.1,
   }).play(world);
+
+  console.log("Robo-Game server initialized.");
 });
+
+console.log("Starting HYTOPIA server...");
