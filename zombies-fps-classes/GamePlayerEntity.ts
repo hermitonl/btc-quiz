@@ -23,7 +23,7 @@ import PistolEntity from './guns/PistolEntity';
 
 import InteractableEntity from './InteractableEntity';
 import type GunEntity from './GunEntity';
-import { INVISIBLE_WALL_COLLISION_GROUP } from '../gameConfig';
+import { INVISIBLE_WALL_COLLISION_GROUP } from '../zombies-fps-gameConfig';
 import GameManager from './GameManager';
 
 const BASE_HEALTH = 100;
@@ -86,7 +86,7 @@ export default class GamePlayerEntity extends PlayerEntity {
     // Setup damage audio
     this._damageAudio = new Audio({
       attachedToEntity: this,
-      uri: 'audio/sfx/player-hurt.mp3',
+      uri: 'audio/sfx/zombies-fps/player-hurt.mp3',
       loop: false,
       volume: 0.7,
     });
@@ -94,7 +94,7 @@ export default class GamePlayerEntity extends PlayerEntity {
     // Setup purchase audio
     this._purchaseAudio = new Audio({
       attachedToEntity: this,
-      uri: 'audio/sfx/purchase.mp3',
+      uri: 'audio/sfx/zombies-fps/purchase.mp3',
       loop: false,
       volume: 1,
     });

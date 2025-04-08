@@ -1,7 +1,7 @@
 import { Audio, Collider, ColliderShape, CollisionGroup, GameServer } from 'hytopia';
 import GamePlayerEntity from './GamePlayerEntity';
 import PurchaseBarrierEntity from './PurchaseBarrierEntity';
-import { INVISIBLE_WALLS, INVISIBLE_WALL_COLLISION_GROUP, PURCHASE_BARRIERS, ENEMY_SPAWN_POINTS, WEAPON_CRATES } from '../gameConfig';
+import { INVISIBLE_WALLS, INVISIBLE_WALL_COLLISION_GROUP, PURCHASE_BARRIERS, ENEMY_SPAWN_POINTS, WEAPON_CRATES } from '../zombies-fps-gameConfig';
 import RipperEntity from './enemies/RipperEntity';
 import ZombieEntity from './enemies/ZombieEntity';
 import WeaponCrateEntity from './WeaponCrateEntity';
@@ -34,7 +34,7 @@ export default class GameManager {
 
   public constructor() {
     this._waveStartAudio = new Audio({
-      uri: 'audio/sfx/wave-start.mp3',
+      uri: 'audio/sfx/zombies-fps/wave-start.mp3',
       loop: false,
       volume: 1,
     });
@@ -104,7 +104,7 @@ export default class GameManager {
 
     // Start ambient music
     (new Audio({
-      uri: 'audio/music/bg.mp3',
+      uri: 'audio/music/zombies-fps-bg.mp3',
       loop: true,
       volume: 0.4,
     })).play(world);

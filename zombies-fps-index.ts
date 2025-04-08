@@ -1,7 +1,7 @@
 import { startServer, PlayerEvent } from 'hytopia';
 import worldMap from './assets/maps/terrain.json';
 
-import GameManager from './classes/GameManager';
+import GameManager from './zombies-fps-classes/GameManager';
 
 startServer(world => {
   // Load map.

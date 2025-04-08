@@ -15,10 +15,10 @@ export default class AK47Entity extends PistolEntity {
       name: options.name ?? 'AK-47',
       maxAmmo: options.maxAmmo ?? 30,
       modelUri: options.modelUri ?? 'models/items/ak-47.glb',
-      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/rifle-reload.mp3',
+      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/zombies-fps/rifle-reload.mp3',
       reloadTimeMs: options.reloadTimeMs ?? 1500,
       shootAnimation: options.shootAnimation ?? 'shoot_gun_both',
-      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/rifle-shoot.mp3',
+      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/zombies-fps/rifle-shoot.mp3',
       ...options,
     });
   }

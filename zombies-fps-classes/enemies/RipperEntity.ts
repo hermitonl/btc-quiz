@@ -12,9 +12,9 @@ export default class RipperEntity extends EnemyEntity {
 
     super({
       damage: options.damage ?? 6,
-      damageAudioUri: options.damageAudioUri ?? 'audio/sfx/entity/zombie/zombie-hurt.mp3',
+      damageAudioUri: options.damageAudioUri ?? 'audio/sfx/zombies-fps/entity/zombie/zombie-hurt.mp3',
       health: options.health ?? 300,
-      idleAudioUri: options.idleAudioUri ?? 'audio/sfx/ripper-idle.mp3',
+      idleAudioUri: options.idleAudioUri ?? 'audio/sfx/zombies-fps/ripper-idle.mp3',
       idleAudioVolume: 1,
       idleAudioReferenceDistance: 8,
       jumpHeight: options.jumpHeight ?? 2,

@@ -19,10 +19,10 @@ export default class PistolEntity extends GunEntity {
       modelScale: options.modelScale ?? 1.3,
       parent: options.parent,
       range: options.range ?? 50,
-      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/pistol-reload.mp3',
+      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/zombies-fps/pistol-reload.mp3',
       reloadTimeMs: options.reloadTimeMs ?? 1250,
       shootAnimation: options.shootAnimation ?? 'shoot_gun_right',
-      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/pistol-shoot.mp3',
+      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/zombies-fps/pistol-shoot.mp3',
     });
   }
 

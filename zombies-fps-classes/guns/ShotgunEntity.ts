@@ -19,9 +19,9 @@ export default class ShotgunEntity extends GunEntity {
       modelScale: options.modelScale ?? 1.2,
       parent: options.parent,
       range: options.range ?? 8,
-      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/shotgun-reload.mp3',
+      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/zombies-fps/shotgun-reload.mp3',
       reloadTimeMs: options.reloadTimeMs ?? 1000,
-      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/shotgun-shoot.mp3',
+      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/zombies-fps/shotgun-shoot.mp3',
       shootAnimation: options.shootAnimation ?? 'shoot_gun_both',
     });
   }

@@ -101,7 +101,7 @@ export default class WeaponCrateEntity extends InteractableEntity {
 
     this._rouletteAudio = new Audio({
       attachedToEntity: this,
-      uri: 'audio/sfx/roulette.mp3',
+      uri: 'audio/sfx/zombies-fps/roulette.mp3',
       volume: 0.3,
       referenceDistance: 4,
     });

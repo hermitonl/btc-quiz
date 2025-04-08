@@ -15,10 +15,10 @@ export default class AR15Entity extends PistolEntity {
       name: options.name ?? 'AR-15',
       maxAmmo: options.maxAmmo ?? 30,
       modelUri: options.modelUri ?? 'models/items/ar-15.glb',
-      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/rifle-reload.mp3',
+      reloadAudioUri: options.reloadAudioUri ?? 'audio/sfx/zombies-fps/rifle-reload.mp3',
       reloadTimeMs: options.reloadTimeMs ?? 1500,
       shootAnimation: options.shootAnimation ?? 'shoot_gun_both',
-      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/rifle-shoot.mp3',
+      shootAudioUri: options.shootAudioUri ?? 'audio/sfx/zombies-fps/rifle-shoot.mp3',
       ...options,
     });
   }
