@@ -45,7 +45,7 @@ import type {
   EventPayloads,
 } from 'hytopia';
 
-import map from './assets/map.json';
+import map from './assets/maps/payload-game-map.json';
 
 // Constants
 const BULLET_SPEED = 50;
@@ -108,7 +108,7 @@ startServer(world => { // Perform our game setup logic in the startServer init c
     const playerEntity = new PlayerEntity({ // Create an entity our newly joined player controls
       player,
       name: 'Player',
-      modelUri: 'models/soldier-player.gltf',
+      modelUri: 'models/players/soldier-player.gltf',
       modelLoopedAnimations: [ 'idle_lower', 'idle_gun_right' ],
       modelScale: 0.5,
     });
@@ -145,7 +145,7 @@ startServer(world => { // Perform our game setup logic in the startServer init c
 
     // Spawn gun as child entity
     const gun = new Entity({
-      modelUri: 'models/raygun.gltf',
+      modelUri: 'models/items/raygun.gltf',
       modelScale: 0.04,
       parent: playerEntity,
       parentNodeName: 'hand_right_anchor',
@@ -233,7 +233,7 @@ function spawnBullet(world: World, coordinate: Vector3Like, direction: Vector3Li
   // Spawn a bullet when the player shoots.
   const bullet = new Entity({
     name: 'Bullet',
-    modelUri: 'models/bullet.gltf',
+    modelUri: 'models/items/bullet.gltf',
     modelScale: 0.3,
     rigidBodyOptions: {
       type: RigidBodyType.KINEMATIC_VELOCITY, // Kinematic means entity's rigid body will not be affected by physics. KINEMATIC_VELOCITY means the entity is moved by setting velocity.
@@ -245,7 +245,7 @@ function spawnBullet(world: World, coordinate: Vector3Like, direction: Vector3Li
       rotation: getRotationFromDirection(direction), // Get the rotation from the direction vector so it's facing the right way we shot it
       colliders: [
         {
-          ...Collider.optionsFromModelUri('models/bullet.gltf', 0.3),
+          ...Collider.optionsFromModelUri('models/items/bullet.gltf', 0.3),
           isSensor: true,
         }
       ]
@@ -308,14 +308,14 @@ function spawnPayloadEntity(world: World) {
   payloadEntity = new Entity({
     controller: new SimpleEntityController(),
     name: 'Payload',
-    modelUri: 'models/payload.gltf',
+    modelUri: 'models/items/payload.gltf',
     modelScale: 0.7,
     modelLoopedAnimations: [ 'idle' ],
     rigidBodyOptions: {
       type: RigidBodyType.KINEMATIC_POSITION,
       colliders: [
         // Get hitbox collider as collider options based on the model & scale.
-        Collider.optionsFromModelUri('models/payload.gltf', 0.7),
+        Collider.optionsFromModelUri('models/items/payload.gltf', 0.7),
         {
           shape: ColliderShape.BLOCK, // Create a proximity sensor for movement when players are near.
           halfExtents: { x: 3.75, y: 2, z: 6 },
