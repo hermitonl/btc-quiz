@@ -33,7 +33,7 @@ import {
 	Vector3,
 } from "hytopia";
 
-import worldMap from "./assets/map.json";
+import worldMap from "./assets/maps/ai-agents-map.json";
 import { FollowBehavior } from "./src/behaviors/FollowBehavior";
 import { BaseAgent } from "./src/BaseAgent";
 import { PathfindingBehavior } from "./src/behaviors/PathfindingBehavior";
