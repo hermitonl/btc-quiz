@@ -7,7 +7,7 @@ import {
   PlayerEvent,
 } from 'hytopia';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/maps/lighting-map.json';
 
 startServer(world => {
   world.loadMap(worldMap);
