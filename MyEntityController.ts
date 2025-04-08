@@ -151,9 +151,13 @@ export default class MyEntityController extends BaseEntityController {
         this._groundContactCount += started ? 1 : -1;
   
         if (!this._groundContactCount) {
-          entity.startModelOneshotAnimations([ 'jump_loop' ]);
+          if (entity.isSpawned) { // Add check here
+            entity.startModelOneshotAnimations([ 'jump_loop' ]);
+          }
         } else {
-          entity.stopModelAnimations([ 'jump_loop' ]);
+          if (entity.isSpawned) { // Add check here
+            entity.stopModelAnimations([ 'jump_loop' ]);
+          }
         }
 
         // Platform contact
