@@ -6,7 +6,7 @@ import {
   World,
 } from 'hytopia';
 
-import worldMap from '../assets/map.json';
+import worldMap from '../assets/maps/hygrounds-map.json';
 
 import {
   BEDROCK_BLOCK_ID,
@@ -21,7 +21,7 @@ import {
   MINIMUM_PLAYERS_TO_START,
   SPAWN_REGION_AABB,
   RANK_WIN_EXP,
-} from '../gameConfig';
+} from '../hygrounds-gameConfig';
 
 import GamePlayerEntity from './GamePlayerEntity';
 import ChestEntity from './ChestEntity';

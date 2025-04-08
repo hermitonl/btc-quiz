@@ -10,7 +10,7 @@ import {
   World,
 } from 'hytopia';
 
-import { CHEST_DROP_ITEMS, CHEST_MAX_DROP_ITEMS, CHEST_OPEN_DESPAWN_MS } from '../gameConfig';
+import { CHEST_DROP_ITEMS, CHEST_MAX_DROP_ITEMS, CHEST_OPEN_DESPAWN_MS } from '../hygrounds-gameConfig';
 import ItemFactory from './ItemFactory';
 
 export default class ChestEntity extends Entity {

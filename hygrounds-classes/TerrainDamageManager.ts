@@ -3,7 +3,7 @@ import {
   BEDROCK_BLOCK_ID,
   BLOCK_ID_BREAK_DAMAGE,
   BLOCK_ID_MATERIALS,
- } from '../gameConfig';
+ } from '../hygrounds-gameConfig';
 
 interface BlockDamage {
   blockId: number;

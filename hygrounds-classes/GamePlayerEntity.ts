@@ -19,7 +19,7 @@ import GunEntity from './GunEntity';
 import ItemEntity from './ItemEntity';
 import PickaxeEntity from './weapons/PickaxeEntity';
 import MeleeWeaponEntity from './MeleeWeaponEntity';
-import { BUILD_BLOCK_ID, RANKS, RANK_KILL_EXP, RANK_SAVE_INTERVAL_EXP } from '../gameConfig';
+import { BUILD_BLOCK_ID, RANKS, RANK_KILL_EXP, RANK_SAVE_INTERVAL_EXP } from '../hygrounds-gameConfig';
 import GameManager from './GameManager';
 
 const BASE_HEALTH = 100;

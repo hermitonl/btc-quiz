@@ -3,9 +3,9 @@ import {
   PlayerEvent,
 } from 'hytopia';
 
-import GameManager from './classes/GameManager';
+import GameManager from './hygrounds-classes/GameManager';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/maps/hygrounds-map.json';
 
 startServer(world => {
   // Load the game map

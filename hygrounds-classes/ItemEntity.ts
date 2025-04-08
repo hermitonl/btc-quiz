@@ -15,7 +15,7 @@ import {
 } from 'hytopia';
 
 import GamePlayerEntity from './GamePlayerEntity';
-import { ITEM_DESPAWN_TIME_MS } from '../gameConfig';
+import { ITEM_DESPAWN_TIME_MS } from '../hygrounds-gameConfig';
 
 const INVENTORIED_POSITION = { x: 0, y: -300, z: 0 };
 
