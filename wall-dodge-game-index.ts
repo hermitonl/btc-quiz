@@ -17,18 +17,18 @@ import {
   Collider,
 } from 'hytopia';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/maps/wall-dodge-game-map.json';
 
-const GAME_BLOCK_SIZE_RANGE = {
+const GAME_BLOCK_SIZE_RANGE: { x: [number, number], y: [number, number], z: [number, number] } = {
   x: [ 0.5, 4 ],
   y: [ 0.5, 4 ],
   z: [ 0.5, 1.5 ],
 };
 
-const GAME_BLOCK_SPAWN_RANGE = {
+const GAME_BLOCK_SPAWN_RANGE: { x: [number, number], y: [number, number], z: [number, number] } = {
   x: [ -7, 7 ],
   y: [ 1, 4 ],
-  z: [ -25, -25 ],
+  z: [ -25, -20 ], // Adjusted Z range
 };
 
 const GAME_BLOCK_RANDOM_TEXTURES = [
@@ -60,7 +60,7 @@ startServer(world => {
   startBlockSpawner(world);
 
   (new Audio({
-    uri: 'audio/bgm.mp3',
+    uri: 'audio/music/wall-dodge-game-bgm.mp3',
     loop: true,
     volume: 0.05,
   })).play(world);
@@ -126,9 +126,11 @@ function setupJoinNPC(world: World) {
     offset: { x: 0, y: 1.75, z: 0 },
   });
 
-  npcMessageUI.load(world);
-
+  // Spawn the NPC first
   joinNPC.spawn(world, { x: 1, y: 3.1, z: 15 });
+
+  // Then load the UI attached to it
+  npcMessageUI.load(world);
 }
 
 /**
