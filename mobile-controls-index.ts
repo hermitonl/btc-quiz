@@ -4,7 +4,7 @@ import {
   PlayerEvent,
 } from 'hytopia';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/maps/mobile-controls-map.json';
 
 startServer(world => {
   world.loadMap(worldMap);
@@ -20,7 +20,7 @@ startServer(world => {
     });
 
     // Load our game UI for this player, this creates our mobile controls UI
-    player.ui.load('ui/index.html');
+    player.ui.load('ui/mobile-controls-index.html');
   
     playerEntity.spawn(world, { x: 0, y: 10, z: 0 });
   });
