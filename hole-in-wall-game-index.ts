@@ -18,7 +18,7 @@ import {
 
 import GAME_WALL_SHAPES from './wall-shapes';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/maps/hole-in-wall-game-map.json';
 
 // Game constants
 enum GameWallDirection {
