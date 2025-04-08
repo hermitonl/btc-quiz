@@ -9,7 +9,7 @@ import {
   ColliderShape,
 } from 'hytopia';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/maps/pathfinding-map.json';
 
 startServer(world => {
   world.loadMap(worldMap);
