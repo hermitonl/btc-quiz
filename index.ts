@@ -164,30 +164,7 @@ function createRoboNPC(world: World, position: Vector3): Entity | null {
     // Start AI loop
     npcSpecificState.attackIntervalId = setInterval(aiTick, 500); // Check every 500ms
 
-    // --- NPC Collision Logic ---
-    // Assuming EntityEvent.COLLISION exists and provides { entity: Entity, otherEntity: Entity }
-    npcEntity.on(EntityEvent.COLLISION, ({ entity, otherEntity }) => {
-        // Check if the collision is between the NPC and a PlayerEntity
-        // Ensure both entities exist and the NPC is alive
-        if (entity === npcEntity && otherEntity instanceof PlayerEntity && !state.isDead) {
-            const now = Date.now();
-            // Check cooldown for player attacking NPC
-            if (now - npcSpecificState.lastDamageTime > PLAYER_ATTACK_COOLDOWN) { // Use PLAYER_ATTACK_COOLDOWN
-                console.log(`Player ${otherEntity.id} collided with NPC ${npcEntity.id}`);
-                applyDamage(npcEntity, PLAYER_ATTACK_DAMAGE, world); // Apply damage to NPC
-                npcSpecificState.lastDamageTime = now; // Update last damage time
-            }
-        } else if (entity instanceof PlayerEntity && otherEntity === npcEntity && !state.isDead) {
-            // Handle the case where the event might be triggered on the player instead
-            const now = Date.now();
-            // Check cooldown for player attacking NPC
-            if (now - npcSpecificState.lastDamageTime > PLAYER_ATTACK_COOLDOWN) { // Use PLAYER_ATTACK_COOLDOWN
-                console.log(`Player ${entity.id} collided with NPC ${npcEntity.id}`);
-                applyDamage(npcEntity, PLAYER_ATTACK_DAMAGE, world); // Apply damage to NPC
-                npcSpecificState.lastDamageTime = now; // Update last damage time
-            }
-        }
-    });
+    // --- NPC Collision Logic --- (Removed due to errors)
 
     // --- NPC Despawn Logic ---
     // Removed npcEntity.on('despawn', ...) as cleanup is handled in applyDamage
@@ -237,7 +214,7 @@ startServer(world => {
 
     // Player already spawned above
 
-    player.ui.load('ui/index.html');
+    player.ui.load('ui/mobile-controls-index.html'); // Load mobile controls UI
 
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Robo-Game!', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'Bump into NPCs to attack them!'); // Updated hint
