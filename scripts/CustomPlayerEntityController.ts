@@ -171,10 +171,13 @@ export interface PlayerEntityControllerOptions {
           // Ground contact
           this._groundContactCount += started ? 1 : -1;
     
-          if (!this._groundContactCount) {
-            entity.startModelOneshotAnimations([ 'jump_loop' ]);
-          } else {
-            entity.stopModelAnimations([ 'jump_loop' ]);
+          // Check if entity is spawned before manipulating animations
+          if (entity.isSpawned) {
+            if (!this._groundContactCount) {
+              entity.startModelOneshotAnimations([ 'jump_loop' ]);
+            } else {
+              entity.stopModelAnimations([ 'jump_loop' ]);
+            }
           }
   
           // Platform contact
