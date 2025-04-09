@@ -223,12 +223,43 @@ startServer(async world => {
     const username = player.username;
 
     console.log(`Loading data for player ${username}...`);
-    const loadedState = await loadPlayerData(username);
-    playerStates.set(username, loadedState);
-    console.log(`Player ${username} joined. Initial state loaded/set:`, loadedState);
+    const loadedDbState = await loadPlayerData(username); // Returns DbPlayerState | null
+
+    let inMemoryState: InMemoryPlayerState;
+    let isGuest: boolean;
+
+    if (loadedDbState === null) {
+        // Error case during load
+        console.error(`Error loading data for player ${username}. Treating as guest.`);
+        isGuest = true;
+        inMemoryState = {
+            sats: 5, // Default sats on error
+            completedLessons: new Set<string>(),
+            completedQuizzes: new Set<string>(),
+            activeQuiz: null,
+            isGuest: true,
+        };
+    } else {
+        // Check if the loaded data matches the default state returned when player not found
+        isGuest = loadedDbState.sats === 5 &&
+                  loadedDbState.completedLessons.length === 0 &&
+                  loadedDbState.completedQuizzes.length === 0;
+
+        // Create the in-memory state object from the loaded DB state
+        inMemoryState = {
+            sats: loadedDbState.sats,
+            completedLessons: new Set(loadedDbState.completedLessons),
+            completedQuizzes: new Set(loadedDbState.completedQuizzes),
+            activeQuiz: null, // Initialize activeQuiz
+            isGuest: isGuest, // Set the guest flag based on the check
+        };
+    }
+
+    playerStates.set(username, inMemoryState);
+    console.log(`Player ${username} joined. ${isGuest ? 'New player (guest)' : 'Existing player loaded'}. Initial state:`, inMemoryState);
 
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
-    world.chatManager.sendPlayerMessage(player, `Your current balance: ${loadedState.sats} sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00');
+    world.chatManager.sendPlayerMessage(player, `Your current balance: ${inMemoryState.sats} sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00');
   });
 
   // --- Player Leave Logic ---
@@ -253,14 +284,20 @@ startServer(async world => {
     });
 
     // Save player state
-    const finalState = playerStates.get(username); // Re-get state in case it changed during despawn? (unlikely but safe)
+    const finalState = playerStates.get(username);
     if (finalState) {
-        console.log(`Saving final state for player ${username}...`);
-        try {
-            await savePlayerData(username, finalState);
-        } catch (saveError) {
-            console.error(`Failed to save data for player ${username} on leave:`, saveError);
+        // --- MODIFICATION START: Only save if not a guest ---
+        if (!finalState.isGuest) {
+            console.log(`Saving final state for non-guest player ${username}...`);
+            try {
+                await savePlayerData(username, finalState); // Pass the InMemoryPlayerState
+            } catch (saveError) {
+                console.error(`Failed to save data for player ${username} on leave:`, saveError);
+            }
+        } else {
+            console.log(`Skipping save for guest player ${username}.`);
         }
+        // --- MODIFICATION END ---
     } else {
         console.warn(`Could not find final state for leaving player ${username} to save.`);
     }
