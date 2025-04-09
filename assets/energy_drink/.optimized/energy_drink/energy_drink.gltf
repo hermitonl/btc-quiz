@@ -1,0 +1,268 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.1.2",
+    "version": "2.0",
+    "extras": {
+      "author": "Mohammad11qwe (https://sketchfab.com/Mohammad11qwe)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/cold-energy-drink-a7c77ba7ff844fd78d3a429865181b9e",
+      "title": "Cold energy drink"
+    }
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 119712,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 48816,
+      "bufferView": 0,
+      "byteOffset": 239424
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 20482,
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 20482,
+      "max": [
+        98.96206665039062,
+        48.121971130371094,
+        12.396149635314941
+      ],
+      "min": [
+        92.27828979492188,
+        41.438209533691406,
+        0.003719999920576811
+      ],
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 20482,
+      "bufferView": 1,
+      "byteOffset": 24
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 8415,
+      "bufferView": 2,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 8415,
+      "max": [
+        96.61946868896484,
+        46.65169143676758,
+        12.166159629821777
+      ],
+      "min": [
+        94.54911804199219,
+        42.33802032470703,
+        12.004110336303711
+      ],
+      "bufferView": 2,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 8415,
+      "bufferView": 2,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 337056,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 337056,
+      "byteLength": 655424,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 992480,
+      "byteLength": 269280,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    },
+    {
+      "magFilter": 9728,
+      "minFilter": 9986,
+      "wrapS": 33648,
+      "wrapT": 33071
+    }
+  ],
+  "textures": [
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    },
+    {
+      "source": 1,
+      "sampler": 1
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/png",
+      "uri": "textures/hard_plastic_material11_Layer_Stack_baseColor.png"
+    },
+    {
+      "mimeType": "image/png",
+      "uri": "textures/hard_plastic_material11_Layer_Stack_clearcoat.png"
+    },
+    {
+      "mimeType": "image/png",
+      "uri": "textures/metal_sandblasted_material_baseColor.png"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "scene.bin",
+      "byteLength": 1261760
+    }
+  ],
+  "materials": [
+    {
+      "name": "hard_plastic_material11_Layer_Stack",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "roughnessFactor": 0.6,
+        "metallicFactor": 0.6262876229718033,
+        "baseColorTexture": {
+          "index": 0
+        }
+      },
+      "extensions": {
+        "KHR_materials_clearcoat": {
+          "clearcoatFactor": 1,
+          "clearcoatRoughnessFactor": 0,
+          "clearcoatTexture": {
+            "index": 2
+          }
+        },
+        "KHR_materials_specular": {}
+      }
+    },
+    {
+      "name": "metal_sandblasted_material",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "roughnessFactor": 0.6,
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 1
+        }
+      },
+      "extensions": {
+        "KHR_materials_clearcoat": {
+          "clearcoatFactor": 1,
+          "clearcoatRoughnessFactor": 0.04
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Object_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 2,
+            "POSITION": 3,
+            "TEXCOORD_0": 4
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    },
+    {
+      "name": "Object_1",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 5,
+            "POSITION": 6,
+            "TEXCOORD_0": 7
+          },
+          "mode": 4,
+          "material": 1,
+          "indices": 1
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Object_2",
+      "rotation": [
+        -0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "mesh": 0
+    },
+    {
+      "name": "Object_3",
+      "rotation": [
+        -0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "mesh": 1
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0,
+        1
+      ]
+    }
+  ],
+  "scene": 0,
+  "extensionsUsed": [
+    "KHR_materials_clearcoat",
+    "KHR_materials_specular"
+  ]
+}

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Agility Up
+* source:	https://sketchfab.com/3d-models/agility-up-1765981cb0e94288aea55220360e98a0
+* author:	knight_of_the_flame (https://sketchfab.com/knight_of_the_flame)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Agility Up" (https://sketchfab.com/3d-models/agility-up-1765981cb0e94288aea55220360e98a0) by knight_of_the_flame (https://sketchfab.com/knight_of_the_flame) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
