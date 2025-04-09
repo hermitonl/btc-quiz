@@ -22,6 +22,7 @@ export interface InMemoryPlayerState {
     completedQuizzes: Set<string>; // Use Set for efficient lookups
     activeQuiz: ActiveQuizState | null; // Track the current quiz state
     isGuest: boolean; // Flag to indicate if player data was loaded from DB
+    isAuthenticated: boolean; // Flag to indicate if the player has successfully logged in
 }
 
 // --- Shared Definitions ---

@@ -15,8 +15,9 @@ import {
 } from 'hytopia';
 
 import worldMap from './assets/maps/boilerplate.json';
-import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database';
-import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState } from './src/types';
+import { initializeDatabase, loadPlayerData, savePlayerData, registerPlayer } from './src/database'; // Added registerPlayer
+import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, DbPlayerState } from './src/types'; // Added DbPlayerState
+import bcrypt from 'bcrypt'; // Added bcrypt
 
 // --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
@@ -238,12 +239,15 @@ startServer(async world => {
             completedQuizzes: new Set<string>(),
             activeQuiz: null,
             isGuest: true,
+            isAuthenticated: false, // Initialize as not authenticated
         };
     } else {
         // Check if the loaded data matches the default state returned when player not found
-        isGuest = loadedDbState.sats === 5 &&
-                  loadedDbState.completedLessons.length === 0 &&
-                  loadedDbState.completedQuizzes.length === 0;
+        // Check if the loaded data has a password hash - if not, it's likely the default object
+        // or an old record before passwords were added. Treat as guest initially.
+        // The 'isGuest' flag now primarily means "does this username exist in the DB?".
+        // Authentication determines if they *proved* they are that user.
+        isGuest = !('passwordHash' in loadedDbState && loadedDbState.passwordHash !== null);
 
         // Create the in-memory state object from the loaded DB state
         inMemoryState = {
@@ -251,7 +255,8 @@ startServer(async world => {
             completedLessons: new Set(loadedDbState.completedLessons),
             completedQuizzes: new Set(loadedDbState.completedQuizzes),
             activeQuiz: null, // Initialize activeQuiz
-            isGuest: isGuest, // Set the guest flag based on the check
+            isGuest: isGuest, // Set the guest flag based on DB existence (presence of hash)
+            isAuthenticated: false, // Initialize as not authenticated, requires /login
         };
     }
 
@@ -260,6 +265,9 @@ startServer(async world => {
 
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
     world.chatManager.sendPlayerMessage(player, `Your current balance: ${inMemoryState.sats} sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00');
+    // Add instructions for register/login
+    world.chatManager.sendPlayerMessage(player, `To save your progress, use: /register <username> <password>`, 'ADD8E6');
+    world.chatManager.sendPlayerMessage(player, `If you already have an account, use: /login <username> <password>`, 'ADD8E6');
   });
 
   // --- Player Leave Logic ---
@@ -287,7 +295,8 @@ startServer(async world => {
     const finalState = playerStates.get(username);
     if (finalState) {
         // --- MODIFICATION START: Only save if not a guest ---
-        if (!finalState.isGuest) {
+        // --- MODIFICATION START: Only save if authenticated ---
+        if (finalState.isAuthenticated) {
             console.log(`Saving final state for non-guest player ${username}...`);
             try {
                 await savePlayerData(username, finalState); // Pass the InMemoryPlayerState
@@ -295,9 +304,9 @@ startServer(async world => {
                 console.error(`Failed to save data for player ${username} on leave:`, saveError);
             }
         } else {
-            console.log(`Skipping save for guest player ${username}.`);
+            console.log(`Skipping save for non-authenticated player ${username}.`);
         }
-        // --- MODIFICATION END ---
+        // --- MODIFICATION END: Only save if authenticated ---
     } else {
         console.warn(`Could not find final state for leaving player ${username} to save.`);
     }
@@ -430,6 +439,116 @@ startServer(async world => {
       }
 
       // Add other commands here if needed
+
+      // --- /register Command ---
+      else if (message.startsWith('/register ')) {
+          // Check if player is already authenticated
+          if (playerState.isAuthenticated) {
+              world.chatManager.sendPlayerMessage(player, 'You are already logged in. Cannot register again.', 'FFA500');
+              return;
+          }
+
+          const args = message.substring('/register '.length).trim().split(' ');
+          if (args.length !== 2) {
+              world.chatManager.sendPlayerMessage(player, 'Usage: /register <username> <password>', 'FFA500');
+              return;
+          }
+          const [regUsername, regPassword] = args;
+
+          // Basic validation (could add more checks like length, characters)
+          if (!regUsername || !regPassword) {
+               world.chatManager.sendPlayerMessage(player, 'Username and password cannot be empty.', 'FF0000');
+               return;
+          }
+
+          // Prevent registration if already logged in with a different account? - Handled by the check above
+          // For simplicity, allow registration attempt even if logged in. - Removed this comment, check added
+          // The database check will prevent duplicate usernames.
+
+          registerPlayer(regUsername, regPassword).then(result => {
+              world.chatManager.sendPlayerMessage(player, `[Register]: ${result.message}`, result.success ? '00FF00' : 'FF0000');
+              // --- Auto-login on successful registration ---
+              if (result.success) {
+                  // Update the current player's state to authenticated
+                  playerState.isAuthenticated = true;
+                  playerState.isGuest = false;
+                  // Set initial state values (matching DB defaults on register)
+                  playerState.sats = 5; // Default sats
+                  playerState.completedLessons = new Set();
+                  playerState.completedQuizzes = new Set();
+                  playerStates.set(username, playerState); // Update the map
+
+                  world.chatManager.sendPlayerMessage(player, `You have been automatically logged in as ${regUsername}.`, '00FF00');
+                  console.log(`Player ${username} registered and automatically logged in as ${regUsername}.`);
+              }
+              // --- End Auto-login ---
+          }).catch(err => {
+              console.error(`[Register Command] Error during registration for ${regUsername}:`, err);
+              world.chatManager.sendPlayerMessage(player, '[Register]: An unexpected error occurred.', 'FF0000');
+          });
+      }
+
+      // --- /login Command ---
+      else if (message.startsWith('/login ')) {
+           const args = message.substring('/login '.length).trim().split(' ');
+           if (args.length !== 2) {
+               world.chatManager.sendPlayerMessage(player, 'Usage: /login <username> <password>', 'FFA500');
+               return;
+           }
+           const [loginUsername, loginPassword] = args;
+
+           if (!loginUsername || !loginPassword) {
+               world.chatManager.sendPlayerMessage(player, 'Username and password cannot be empty.', 'FF0000');
+               return;
+           }
+
+           // Check if already authenticated (can't log in again)
+           if (playerState.isAuthenticated) {
+               world.chatManager.sendPlayerMessage(player, 'You are already logged in.', 'FFA500');
+               return;
+           }
+
+           // Attempt to load data for the provided username
+           loadPlayerData(loginUsername).then(async loadedData => {
+               // Check if data was found AND it has the passwordHash property
+               if (loadedData && 'passwordHash' in loadedData && loadedData.passwordHash) {
+                   try {
+                       const match = await bcrypt.compare(loginPassword, loadedData.passwordHash);
+                       if (match) {
+                           // --- Login Successful ---
+                           // Update the current player's state in the map
+                           playerState.sats = loadedData.sats;
+                           playerState.completedLessons = new Set(loadedData.completedLessons);
+                           playerState.completedQuizzes = new Set(loadedData.completedQuizzes);
+                           playerState.isAuthenticated = true;
+                           playerState.isGuest = false; // No longer a guest after successful login
+                           // Note: We are updating the state associated with the *current* player connection (player.username)
+                           // If loginUsername is different from player.username (e.g., guest trying to log in),
+                           // this correctly updates *their* session state.
+                           playerStates.set(username, playerState); // Ensure map is updated
+
+                           world.chatManager.sendPlayerMessage(player, `Login successful! Welcome back, ${loginUsername}.`, '00FF00');
+                           world.chatManager.sendPlayerMessage(player, `Your balance: ${playerState.sats} sats.`, 'FFFF00');
+                           console.log(`Player ${username} successfully logged in as ${loginUsername}. State updated.`);
+
+                       } else {
+                           // Password mismatch
+                           world.chatManager.sendPlayerMessage(player, 'Invalid username or password.', 'FF0000');
+                       }
+                   } catch (compareError) {
+                        console.error(`[Login Command] Error comparing password for ${loginUsername}:`, compareError);
+                        world.chatManager.sendPlayerMessage(player, 'Error during login. Please try again.', 'FF0000');
+                   }
+               } else {
+                   // User not found in DB or no password hash stored
+                   world.chatManager.sendPlayerMessage(player, 'Invalid username or password.', 'FF0000');
+               }
+           }).catch(loadError => {
+               console.error(`[Login Command] Error loading player data for ${loginUsername}:`, loadError);
+               world.chatManager.sendPlayerMessage(player, 'Error during login. Please try again.', 'FF0000');
+           });
+      }
+
   });
 
   console.log("Bitcoin Learning Game server initialized with NPCs, quiz logic, chat commands, and DB persistence.");
