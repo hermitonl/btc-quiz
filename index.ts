@@ -11,6 +11,8 @@ import {
   // Input, // Removed unused import
   RigidBodyType, // Import RigidBodyType
   ColliderShape, // Import ColliderShape
+  BlockType, // Import BlockType
+  ChatEvent, // Import ChatEvent
 } from 'hytopia';
 
 // Use the specified boilerplate map
@@ -107,7 +109,7 @@ startServer(world => {
                       halfHeight: 1.5,
                       isSensor: true,
                       tag: 'interaction-sensor',
-                      onCollision: (other: Entity | BlockType, started: boolean) => {
+                      onCollision: (other: Entity | BlockType, started: boolean) => { // Type should be correct now
                           // Trigger only when collision starts and the other entity is a PlayerEntity
                           if (started && other instanceof PlayerEntity && other.player) {
                               handleNpcInteraction(world, other.player, infoSkeleton.id);
@@ -142,7 +144,7 @@ startServer(world => {
                       halfHeight: 1.5,
                       isSensor: true,
                       tag: 'interaction-sensor',
-                      onCollision: (other: Entity | BlockType, started: boolean) => {
+                      onCollision: (other: Entity | BlockType, started: boolean) => { // Type should be correct now
                           if (started && other instanceof PlayerEntity && other.player) {
                               handleNpcInteraction(world, other.player, dataBones.id);
                           }
@@ -175,7 +177,7 @@ startServer(world => {
                       halfHeight: 1.5,
                       isSensor: true,
                       tag: 'interaction-sensor',
-                      onCollision: (other: Entity | BlockType, started: boolean) => {
+                      onCollision: (other: Entity | BlockType, started: boolean) => { // Type should be correct now
                           if (started && other instanceof PlayerEntity && other.player) {
                               handleNpcInteraction(world, other.player, quizMind.id);
                           }
@@ -310,6 +312,7 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
     } else if (npcInfo.type === 'quiz') {
         const quiz = quizzes.find(q => q.id === npcInfo.dataId);
         if (quiz) {
+            // Only inform the player about the quiz on collision
             world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: This is the ${quiz.topic} quiz. Type /startquiz ${quiz.id} to begin (Cost: ${quiz.cost} sat).`, 'FFA500'); // Orange
         } else {
             console.error(`Quiz NPC (ID: ${npcEntityId}) has invalid dataId: ${npcInfo.dataId}`);
@@ -318,7 +321,44 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
     }
 }
 
-// --- Ambient Audio (Optional) ---
+// --- Chat Command Handling ---
+  world.chatManager.on(ChatEvent.BROADCAST_MESSAGE, ({ player, message }) => { // Revert to using 'message'
+      if (!player || player.id === undefined) return; // Ignore non-player messages or players without ID
+
+      if (message.startsWith('/startquiz ')) {
+          const quizId = message.substring('/startquiz '.length).trim();
+          const quiz = quizzes.find(q => q.id === quizId);
+
+          if (quiz) {
+              const playerId = player.id;
+              const playerState = playerStates.get(playerId);
+
+              if (!playerState) {
+                  world.chatManager.sendPlayerMessage(player, `[System]: Your state could not be found. Please rejoin.`, 'FF0000');
+                  return;
+              }
+
+              if (playerState.sats >= quiz.cost) {
+                  if (updateSats(playerId, -quiz.cost)) { // Deduct cost
+                      world.chatManager.sendPlayerMessage(player, `Starting quiz "${quiz.topic}"... Cost: ${quiz.cost} sats deducted. Your balance: ${playerState.sats} sats.`, '00FF00');
+                      // TODO: Implement actual quiz logic here (send questions, track answers, timer, etc.)
+                      world.chatManager.sendPlayerMessage(player, `(Quiz logic not yet implemented!)`, 'FFFF00');
+                  } else {
+                      // This case should ideally not happen if the check above passed, but good practice
+                      world.chatManager.sendPlayerMessage(player, `Failed to deduct sats for quiz "${quiz.topic}". Please try again.`, 'FF0000');
+                  }
+              } else {
+                  world.chatManager.sendPlayerMessage(player, `You don't have enough sats to start the "${quiz.topic}" quiz. Cost: ${quiz.cost} sats. You have: ${playerState.sats} sats.`, 'FF0000');
+              }
+          } else {
+              world.chatManager.sendPlayerMessage(player, `Quiz with ID "${quizId}" not found.`, 'FF0000');
+          }
+      }
+      // Add other command handlers here if needed
+  });
+
+
+  // --- Ambient Audio (Optional) ---
   // Keep or modify as needed for the new game's atmosphere
   new Audio({
     uri: 'audio/music/hytopia-main.mp3', // Consider changing this later
@@ -326,5 +366,5 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
     volume: 0.1,
   }).play(world);
 
-  console.log("Bitcoin Learning Game server initialized with NPCs.");
+  console.log("Bitcoin Learning Game server initialized with NPCs and chat commands.");
 }); // END startServer
