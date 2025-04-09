@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/bun": "latest",
     "@types/pg": "^8.11.11"
   },
@@ -12,6 +13,7 @@
   },
   "dependencies": {
     "@hytopia.com/assets": "^0.2.8",
+    "bcrypt": "^5.1.1",
     "hytopia": "^0.3.28",
     "pg": "^8.14.1"
   }
