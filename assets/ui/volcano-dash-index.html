@@ -1,0 +1,2230 @@
+<!-- ==================== JavaScript Section ==================== -->
+<!-- Core game state variables -->
+<script>
+  let currentPlayerName = '';  // Track current player's name
+  let currentPlayerId = null;  // Track current player's ID
+  let playerNickname = '';     // Track player nickname
+  let currentChargingSound = null;
+  let currentOverheatSound = null;
+  let currentLavaSound = null;
+
+  // Add this near the top with other utility functions
+  function playButtonClickSound() {
+    try {
+      const clickSound = new Audio(`{{CDN_ASSETS_URL}}/sounds/sfx/ui/button-click.mp3`);
+      clickSound.volume = 0.2;
+      // Only play if user has interacted with the page
+      if (document.documentElement.hasAttribute('data-user-interacted')) {
+        clickSound.play().catch(err => {
+          console.error('Error playing click sound:', err);
+        });
+      }
+    } catch (err) {
+      console.error('Error creating click sound:', err);
+    }
+  }
+
+  // Add this function near other utility functions
+  function playChargingSound() {
+    if (!currentChargingSound) {
+      try {
+        currentChargingSound = new Audio(`{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/neopolitansixth-formant-riser.mp3`);
+        currentChargingSound.volume = 0.8;
+        
+        currentChargingSound.addEventListener('canplaythrough', () => {
+          if (document.documentElement.hasAttribute('data-user-interacted')) {
+            currentChargingSound.play().catch(err => {
+              console.error('Error playing charging sound:', err);
+            });
+          }
+        });
+
+        currentChargingSound.load();
+      } catch (err) {
+        console.error('Error creating charging sound:', err);
+      }
+    }
+  }
+
+  function stopChargingSound() {
+    if (currentChargingSound) {
+      // Fade out over 0.5 seconds
+      const fadeOut = setInterval(() => {
+        if (currentChargingSound && currentChargingSound.volume > 0.05) {
+          currentChargingSound.volume -= 0.1;
+        } else {
+          clearInterval(fadeOut);
+          if (currentChargingSound) {
+            currentChargingSound.pause();
+            currentChargingSound.currentTime = 0;
+            currentChargingSound = null;
+          }
+        }
+      }, 50);
+    }
+  }
+
+  // Partner request handler - Called when player clicks to request a partnership
+  window.requestPartner = function(id, name) {
+    playButtonClickSound();
+    hytopia.sendData({
+      type: 'requestPartner',
+      targetId: id
+    });
+    
+    const statusEl = document.getElementById('selectionStatus');
+    if (statusEl) {
+      statusEl.textContent = `Request sent to ${name}...`;
+      statusEl.className = 'selection-status pending';
+    }
+  };
+
+  // Main event handler - Processes all incoming game events
+  hytopia.onData((data) => {
+    if (data.type === 'nearOverheat') {
+      if (data.active) {
+        playOverheatSound();
+      } else {
+        stopOverheatSound();
+      }
+    }
+
+    // Handle initial state
+    if (data.type === 'initialState') {
+      currentPlayerName = data.playerName;
+      currentPlayerId = data.playerId;
+      updateLeaderboards(data.lastShiftLeaders, data.allTimeLeaders);
+    }
+
+    // Handle game start
+    if (data.type === 'gameStart') {
+      const bottomUI = document.querySelector('.bottom-ui-container');
+      if (bottomUI) {
+        bottomUI.style.display = 'flex';
+      }
+      // Hide partner selection UI
+      const partnerSelectionUI = document.getElementById('partnerSelectionUI');
+      if (partnerSelectionUI) {
+        // Add fade-out class
+        partnerSelectionUI.classList.add('fade-out');
+        
+        // Remove from DOM after fade completes
+        setTimeout(() => {
+          partnerSelectionUI.style.display = 'none';
+          partnerSelectionUI.classList.remove('fade-out');
+        }, 500);
+      }
+    }
+
+    // Handle game end
+    if (data.type === 'gameEnd') {
+      const bottomUI = document.querySelector('.bottom-ui-container');
+      if (bottomUI) {
+        bottomUI.style.display = 'none';
+      }
+      stopOverheatSound();
+      stopLavaSound();
+    }
+
+    // Handle name confirmation
+    if (data.type === 'nameSet') {
+      currentPlayerName = data.name;
+      currentPlayerId = data.playerId;    
+    }
+
+    // Handle player state updates
+    if (data.type === 'updatePlayerState') {
+      var heatBar = document.getElementById('heatBar');
+      var heatPercent = (data.heatLevel / 1000) * 100;
+      heatBar.style.width = heatPercent + '%';
+      heatBar.style.backgroundColor = heatPercent > 75 ? '#ff0000' : 
+                                    heatPercent > 50 ? '#ff6600' : '#ffaa00';
+
+      document.getElementById('lavaOverlay').style.opacity = data.inLava ? '0.4' : '0';
+      if (data.inLava) {
+        playLavaSound();
+      } else {
+        stopLavaSound();
+      }
+      document.getElementById('currentScore').textContent = formatScore(data.score);
+      document.getElementById('personalBestScore').textContent = formatScore(data.topScore);
+      
+      // Update leaderboards if included
+      if (data.lastShiftLeaders && data.allTimeLeaders) {
+        updateLeaderboards(data.lastShiftLeaders, data.allTimeLeaders);
+      }
+      
+      // Update teleport charges with explicit check
+      const teleportChargesElement = document.getElementById('teleportCharges');
+      if (teleportChargesElement) {
+        teleportChargesElement.textContent = data.teleportCharges;  
+      }
+
+      // Update currentPlayerName if included in state update
+      if (data.playerName) {
+        currentPlayerName = data.playerName;
+      }
+    }
+
+    // Handle countdown updates
+    if (data.type === 'countdownUpdate') {
+      var messageEl = document.getElementById('countdownMessage');
+      if (!messageEl) return;
+      
+      if (data.seconds <= 0) {
+        messageEl.classList.remove('visible');
+        messageEl.textContent = '';
+        // Ensure it's hidden after fade
+        setTimeout(() => {
+          messageEl.style.display = 'none';
+        }, 2000);
+      } else {
+        messageEl.style.display = 'block';
+        messageEl.textContent = `Shift Starting in ${data.seconds} Seconds`;
+        messageEl.classList.add('visible');
+        
+        // Add fade out for last 2 seconds
+        if (data.shouldFade) {
+          messageEl.style.opacity = '0';
+          messageEl.style.transition = 'opacity 2s';
+        } else {
+          messageEl.style.opacity = '1';
+          messageEl.style.transition = 'opacity 0.5s';
+        }
+      }
+    }
+
+    // Handle supercharge states
+    if (data.type === 'superChargeState') {
+      const superChargeUI = document.getElementById('superChargeUI');
+      const chargeBar = document.getElementById('chargeBar');
+      const chargeFill = chargeBar.querySelector('.charge-fill');
+      const superChargePrompt = document.getElementById('superChargePrompt');
+
+      switch(data.state) {
+        case 'enter':
+          superChargeUI.style.display = 'block';
+          chargeBar.style.display = 'none';
+          superChargePrompt.textContent = 'Hold F to super charge your energy!';
+          break;
+          
+        case 'charging':
+          superChargeUI.style.display = 'block';
+          chargeBar.style.display = 'block';
+          chargeFill.style.width = `${data.progress}%`;
+          superChargePrompt.textContent = 'Hold F Until Complete!';
+          if (data.progress <= 5) {
+            playChargingSound();
+          }
+          break;
+          
+        case 'reset':
+          chargeBar.style.display = 'none';
+          chargeFill.style.width = '0%';
+          superChargePrompt.textContent = 'Oh No! You let go!';
+          stopChargingSound();
+          setTimeout(() => {
+            superChargePrompt.textContent = 'Hold F to Super Charge your Energy';
+          }, 1000);
+          break;
+          
+        case 'complete':
+          chargeBar.style.display = 'none';
+          superChargePrompt.textContent = 'Super Charge Successful!';
+          stopChargingSound();
+          setTimeout(() => {
+            superChargeUI.style.display = 'none';
+          }, 2000);
+          break;
+          
+        case 'exit':
+          superChargeUI.style.display = 'none';
+          stopChargingSound();
+          break;
+
+        case 'alreadyUsed':
+          superChargeUI.style.display = 'block';
+          chargeBar.style.display = 'none';
+          superChargePrompt.textContent = 'Already used this Super Charge!';
+          setTimeout(() => {
+            superChargeUI.style.display = 'none';
+          }, 2000);
+          break;
+      }
+    }
+
+    // Handle leaderboard updates
+    if (data.type === 'updateLeaderboards') {
+      updateLeaderboards(data.lastShiftLeaders, data.allTimeLeaders);
+    }
+
+    if (data.type === 'heatClusterStatus') {
+      const notification = document.getElementById('heatClusterNotification');
+      
+      if (data.active) {
+        notification.textContent = data.message;
+        notification.classList.add('active');
+      } else {
+        notification.classList.remove('active');
+      }
+    }
+
+    if (data.type === 'partnerSelection') {
+      const partnerUI = document.getElementById('partnerSelectionUI');
+      const partnerList = document.getElementById('partnerList');
+      const statusEl = document.getElementById('selectionStatus');
+      
+      // Clear any existing status messages
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.className = 'selection-status';
+      }
+      
+      // Show the partner selection UI
+      partnerUI.style.display = 'block';
+      partnerUI.classList.remove('fade-out');
+      
+      // Hide any existing partner info
+      const partnerInfo = document.getElementById('partnerInfo');
+      if (partnerInfo) {
+        partnerInfo.style.display = 'none';
+        partnerInfo.querySelector('.partner-name').textContent = '';
+      }
+      
+      if (!data.availablePlayers || data.availablePlayers.length === 0) {
+        partnerList.innerHTML = '<div class="no-partners">Waiting for other players to join...</div>';
+      } else {
+        partnerList.innerHTML = data.availablePlayers
+          .map(player => `
+            <div class="partner-option" onclick="requestPartner(${player.id}, '${player.name.replace(/'/g, "\\'")}')">
+              <div class="player-name">${player.name}</div>
+            </div>
+          `).join('');
+      }
+    }
+
+    if (data.type === 'partnerRequest') {
+      const pendingRequest = document.getElementById('pendingRequest');
+      const message = pendingRequest.querySelector('.request-message');
+      
+      message.textContent = `${data.fromName} wants to be your partner!`;
+      pendingRequest.style.display = 'block';
+
+      // Setup response buttons with sound
+      pendingRequest.querySelector('.accept-btn').onclick = () => {
+        playButtonClickSound();
+        hytopia.sendData({
+          type: 'respondToPartnerRequest',
+          accepted: true
+        });
+        pendingRequest.style.display = 'none';
+      };
+
+      pendingRequest.querySelector('.reject-btn').onclick = () => {
+        playButtonClickSound();
+        hytopia.sendData({
+          type: 'respondToPartnerRequest',
+          accepted: false
+        });
+        pendingRequest.style.display = 'none';
+      };
+    }
+
+    if (data.type === 'partnerRequestFailed') {
+      const statusEl = document.getElementById('selectionStatus');
+      statusEl.textContent = data.message;
+      statusEl.className = 'selection-status error';
+      setTimeout(() => {
+        statusEl.textContent = '';
+        statusEl.className = 'selection-status';
+      }, 3000);
+    }
+
+    if (data.type === 'partnershipFormed') {
+      const partnerUI = document.getElementById('partnerSelectionUI');
+      const confirmationEl = document.getElementById('partnershipConfirmation');
+      const confirmMessageEl = confirmationEl.querySelector('.confirmation-message');
+      
+      // Show confirmation message
+      confirmMessageEl.textContent = `Partnership formed!`;
+      confirmationEl.style.display = 'block';
+      
+      // Hide confirmation after animation
+      setTimeout(() => {
+        confirmationEl.style.display = 'none';
+      }, 3000);
+      
+      // Hide selection UI with fade
+      partnerUI.classList.add('fade-out');
+      setTimeout(() => {
+        partnerUI.style.display = 'none';
+        partnerUI.classList.remove('fade-out');
+        hytopia.sendData({ type: 'lockPointer' });
+      }, 500);
+    }
+
+    if (data.type === 'partnerRequestRejected') {
+      const statusEl = document.getElementById('selectionStatus');
+      statusEl.textContent = `${data.playerName} declined your partnership request`;
+      statusEl.className = 'selection-status error';
+      setTimeout(() => {
+        statusEl.textContent = '';
+        statusEl.className = 'selection-status';
+      }, 3000);
+    }
+
+    if (data.type === 'teleportStatus') {
+      const messageUI = document.getElementById('teleportMessageUI');
+      const messagePrompt = document.getElementById('teleportMessagePrompt');
+      
+      messageUI.style.display = 'block';
+      messagePrompt.textContent = data.message;
+      
+      // Hide the message after 2 seconds
+      setTimeout(() => {
+        messageUI.style.display = 'none';
+      }, 2000);
+    }
+
+    if (data.type === 'showAboutOverlay') {
+      const overlay = document.getElementById('aboutOverlay');
+      overlay.style.display = 'flex';
+    }
+
+    if (data.type === 'showTipsOverlay') {
+      const overlay = document.getElementById('tipsOverlay');
+      overlay.style.display = 'flex';
+    }
+
+    if (data.type === 'showCreditsOverlay') {
+      const overlay = document.getElementById('creditsOverlay');
+      overlay.style.display = 'flex';
+    }
+
+
+    if (data.type === 'heatWarning') {
+      const heatWarning = document.getElementById('heatWarning');
+      if (heatWarning) {
+        heatWarning.style.display = data.show ? 'block' : 'none';
+      }
+    }
+
+    if (data.type === 'overheatMessage') {
+      const message = document.getElementById('overheatMessage');
+      if (message) {
+        message.style.display = 'block';
+        setTimeout(() => {
+          message.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    if (data.type === 'survivalMessage') {
+      const message = document.getElementById('survivalMessage');
+      if (message) {
+        message.style.display = 'block';
+        setTimeout(() => {
+          message.style.display = 'none';
+        }, 10000);
+      }
+    }
+
+    if (data.type === 'playTeleportSound') {
+      const audio = new Audio(`{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/zenithinfinitizestudios-fantasy-ui-button-4.mp3`);
+      audio.volume = 0.6;
+      audio.play();
+    }
+
+    if (data.type === 'playTeleportFailSound') {
+      const audio = new Audio(`{{CDN_ASSETS_URL}}/sounds/sfx/ui/notification-1.mp3`);
+      audio.volume = 0.2;
+      audio.play();
+    }
+
+    if (data.type === 'playTeleportSuccessSound') {
+      const audio = new Audio(`{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/lupine-elfenia-future-ui-acquired.mp3`);
+      audio.volume = 0.6;
+      audio.play();
+    }
+
+    if (data.type === 'shiftWinner') {
+      const winnerMessage = document.getElementById('shiftWinnerMessage');
+      const content = winnerMessage.querySelector('.winner-content');
+      
+      content.innerHTML = `
+        <div>Top Performer Last Shift:</div>
+        <span class="winner-name">${data.winnerName}</span>
+        <div>${formatScore(data.score)} Energy</div>
+      `;
+      
+      winnerMessage.style.opacity = '1';
+      
+      // Hide the message after 10 seconds
+      setTimeout(() => {
+        winnerMessage.style.opacity = '0';
+      }, 10000);
+    }
+
+    if (data.type === 'shiftStatus') {
+      const message = document.getElementById('shiftInProgressMessage');
+      if (message) {
+        if (data.status === 'inProgress') {
+          message.classList.add('visible');
+        } else {
+          message.classList.remove('visible');
+        }
+      }
+    }
+  });
+
+  // Utility Functions
+  function formatScore(score) {
+    return score.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  // Register UI Templates for NPCs and Queue Status
+  hytopia.registerSceneUITemplate('join-npc-message', () => {
+    return document.getElementById('join-npc-message').content.cloneNode(true);
+  });
+
+  hytopia.registerSceneUITemplate('practice-npc-message', () => {
+    return document.getElementById('practice-npc-message').content.cloneNode(true);
+  });
+
+  hytopia.registerSceneUITemplate('player-queued', () => {
+    return document.getElementById('player-queued').content.cloneNode(true);
+  });
+
+  // Updates both last shift and all-time leaderboards with new data
+  function updateLeaderboards(lastShiftLeaders, allTimeLeaders) {
+    const lastShiftList = document.getElementById('lastShiftLeaders');
+    const allTimeList = document.getElementById('allTimeLeaders');
+    
+    if (lastShiftLeaders && lastShiftLeaders.length > 0) {
+      lastShiftList.innerHTML = lastShiftLeaders
+        .map((entry, index) => `
+          <div class="leaderboard-entry ${entry.name === currentPlayerName ? 'current-player' : ''}">
+            <span class="name">${index + 1}. ${entry.name}</span>
+            <span class="score">${formatScore(entry.score)}</span>
+          </div>
+        `).join('');
+    } else {
+      lastShiftList.innerHTML = '<div class="leaderboard-entry">No scores yet</div>';
+    }
+    
+    if (allTimeLeaders && allTimeLeaders.length > 0) {
+      allTimeList.innerHTML = allTimeLeaders
+        .map((entry, index) => `
+          <div class="leaderboard-entry ${entry.name === currentPlayerName ? 'current-player' : ''}">
+            <span class="name">${index + 1}. ${entry.name}</span>
+            <span class="score">${formatScore(entry.score)}</span>
+          </div>
+        `).join('');
+    } else {
+      allTimeList.innerHTML = '<div class="leaderboard-entry">No scores yet</div>';
+    }
+  }
+
+  // Debug logging wrappers for hytopia methods
+  const originalSendData = hytopia.sendData;
+  hytopia.sendData = function(data) {
+    originalSendData.call(this, data);
+  };
+
+  const originalOnData = hytopia.onData;
+  hytopia.onData = function(callback) {
+    originalOnData.call(this, (data) => {
+      callback(data);
+    });
+  };
+
+  function selectPartner(partnerId) {
+    hytopia.sendData({
+      type: 'selectPartner',
+      partnerId
+    });
+  }
+
+  // Name submission handler - Processes initial player name entry and starts game
+  window.submitName = function() {
+    playButtonClickSound();
+    const nameInput = document.getElementById('nameInput');
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    const name = nameInput?.value.trim();
+    if (name) {
+      playerNickname = name;
+      
+      if (welcomeScreen) {
+        welcomeScreen.style.opacity = '0';
+        welcomeScreen.style.transition = 'opacity 0.5s';
+        
+        setTimeout(() => {
+          welcomeScreen.style.display = 'none';
+          hytopia.sendData({ type: 'lockPointer' });
+        }, 500);
+      }
+      
+      hytopia.sendData({
+        type: 'setNickname',
+        nickname: name
+      });
+    }
+  };
+
+  // Handle Enter key press in name input field
+  window.handleEnterKey = function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent default Enter behavior
+      submitName();
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = document.getElementById('nameInput');
+    const submitButton = document.getElementById('submitName');
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    const welcomeContent = document.querySelector('.welcome-content');
+
+    // Focus the input when the page loads
+    nameInput?.focus();
+
+    // Only focus input when clicking within the welcome content
+    welcomeContent?.addEventListener('click', () => {
+      nameInput?.focus();
+    });
+
+    // Prevent any clicks outside the welcome content from reaching the game
+    welcomeScreen?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      // Don't focus input when clicking outside the welcome content
+      if (event.target === welcomeScreen) {
+        event.preventDefault();
+      }
+    });
+
+    // Update button style based on input
+    nameInput?.addEventListener('input', () => {
+      if (submitButton) {
+        submitButton.style.opacity = nameInput.value.trim() ? '1' : '0.5';
+      }
+    });
+
+    // Initialize button style
+    if (submitButton) {
+      submitButton.style.opacity = '0.5';
+    }
+  });
+
+  // Solo mode handler - Called when player chooses to play without a partner
+  window.chooseSolo = function() {
+    playButtonClickSound();
+    const partnerUI = document.getElementById('partnerSelectionUI');
+    const confirmationEl = document.getElementById('partnershipConfirmation');
+    const confirmMessageEl = confirmationEl.querySelector('.confirmation-message');
+    
+    // Show confirmation message
+    confirmMessageEl.textContent = 'NO PARTNER SELECTED';  // Updated text in all caps to match style
+    confirmationEl.style.display = 'block';
+    
+    // Hide confirmation after animation
+    setTimeout(() => {
+      confirmationEl.style.display = 'none';
+    }, 3000);
+    
+    // Hide selection UI with fade
+    partnerUI.classList.add('fade-out');
+    setTimeout(() => {
+      partnerUI.style.display = 'none';
+      partnerUI.classList.remove('fade-out');
+      hytopia.sendData({ type: 'lockPointer' });
+    }, 500);
+
+    // Notify the server of solo choice
+    hytopia.sendData({
+      type: 'chooseSolo'
+    });
+  };
+
+  // Add this function to handle keydown events in the welcome screen
+  window.handleWelcomeKeydown = function(event) {
+    // Stop event propagation to prevent game from receiving keyboard input
+    event.stopPropagation();
+  };
+
+  function closeAboutOverlay() {
+    playButtonClickSound();
+    const overlay = document.getElementById('aboutOverlay');
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.5s';
+    
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.style.opacity = '1';
+    }, 500);
+  }
+
+  // Add keyboard handler for Enter key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const aboutOverlay = document.getElementById('aboutOverlay');
+      const tipsOverlay = document.getElementById('tipsOverlay');
+      const creditsOverlay = document.getElementById('creditsOverlay');
+      
+      if (aboutOverlay.style.display === 'flex') {
+        closeAboutOverlay();
+      }
+      if (tipsOverlay.style.display === 'flex') {
+        closeTipsOverlay();
+      }
+      if (creditsOverlay.style.display === 'flex') {
+        closeCreditsOverlay();
+      }
+    }
+  });
+
+
+  function closeTipsOverlay() {
+    playButtonClickSound();
+    const overlay = document.getElementById('tipsOverlay');
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.5s';
+    
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.style.opacity = '1';
+    }, 500);
+  }
+
+  function closeCreditsOverlay() {
+    playButtonClickSound();
+    const overlay = document.getElementById('creditsOverlay');
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.5s';
+    
+
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.style.opacity = '1';
+    }, 500);
+  }
+
+  // Add click handlers for the chat commands
+  document.addEventListener('DOMContentLoaded', () => {
+    const commands = document.querySelectorAll('.command');
+    commands.forEach(command => {
+      command.addEventListener('click', (e) => {
+        playButtonClickSound();
+        const commandText = e.target.textContent;
+        if (commandText === '!about') {
+          const overlay = document.getElementById('aboutOverlay');
+          overlay.style.display = 'flex';
+        } else if (commandText === '!tips') {
+          const overlay = document.getElementById('tipsOverlay');
+          overlay.style.display = 'flex';
+        } else if (commandText === '!credits') {
+          const overlay = document.getElementById('creditsOverlay');
+          overlay.style.display = 'flex';
+        }
+      });
+    });
+
+  });
+
+  // Add this to track user interaction
+  document.addEventListener('click', () => {
+    document.documentElement.setAttribute('data-user-interacted', 'true');
+    
+    // Preload both sounds after user interaction
+    const preloadLavaSound = new Audio();
+    const preloadOverheatSound = new Audio();
+
+    // Add error handlers to debug path issues
+    preloadLavaSound.addEventListener('error', (e) => {
+    });
+
+    preloadOverheatSound.addEventListener('error', (e) => {
+    });
+
+    // Set sources
+    preloadLavaSound.src = `{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/vd-scriptro-alien-alarm-1a.mp3`;
+    preloadOverheatSound.src = `{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/vd-odilonmarcenaro-arming-burglar-alarm-2.mp3`;
+    
+    preloadLavaSound.load();
+    preloadOverheatSound.load();
+  }, { once: true });
+
+  function playOverheatSound() {
+    if (!currentOverheatSound) {
+      try {
+        currentOverheatSound = new Audio();
+        currentOverheatSound.volume = 0.8;
+        currentOverheatSound.loop = true;
+        
+        // Set up event listeners before setting src
+        currentOverheatSound.addEventListener('canplaythrough', () => {
+          if (document.documentElement.hasAttribute('data-user-interacted')) {
+            currentOverheatSound.play()
+              .then(() => console.log('Overheat sound playing'))
+              .catch(err => console.error('Failed to play overheat sound:', err));
+          }
+        });
+
+        currentOverheatSound.addEventListener('error', (e) => {
+        });
+
+        // Set source after listeners
+        currentOverheatSound.src = `{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/vd-odilonmarcenaro-arming-burglar-alarm-2.mp3`;
+      } catch (err) {
+        console.error('Error creating overheat sound:', err);
+      }
+    }
+  }
+
+  function stopOverheatSound() {
+    if (currentOverheatSound) {
+      const fadeOut = setInterval(() => {
+        if (currentOverheatSound && currentOverheatSound.volume > 0.05) {
+          currentOverheatSound.volume -= 0.1;
+        } else {
+          clearInterval(fadeOut);
+          if (currentOverheatSound) {
+            currentOverheatSound.pause();
+            currentOverheatSound.currentTime = 0;
+            currentOverheatSound = null;
+          }
+        }
+      }, 50);
+    }
+  }
+
+  function playLavaSound() {
+    if (!currentLavaSound) {
+      try {
+        currentLavaSound = new Audio();
+        currentLavaSound.volume = 0.8;
+        currentLavaSound.loop = true;
+        
+        currentLavaSound.addEventListener('canplaythrough', () => {
+          if (document.documentElement.hasAttribute('data-user-interacted')) {
+            currentLavaSound.play()
+              .catch(err => console.error('Failed to play lava sound:', err));
+          }
+        });
+
+        currentLavaSound.src = `{{CDN_ASSETS_URL}}/sounds/sfx/misc/volcano-dash/vd-scriptro-alien-alarm-1a.mp3`;
+      } catch (err) {
+        console.error('Error creating lava sound:', err);
+      }
+    }
+  }
+
+  function stopLavaSound() {
+    if (currentLavaSound) {
+      const fadeOut = setInterval(() => {
+        if (currentLavaSound && currentLavaSound.volume > 0.05) {
+          currentLavaSound.volume -= 0.1;
+        } else {
+          clearInterval(fadeOut);
+          if (currentLavaSound) {
+            currentLavaSound.pause();
+            currentLavaSound.currentTime = 0;
+            currentLavaSound = null;
+          }
+        }
+      }, 50);
+    }
+  }
+</script>
+
+<!-- ==================== Main Game UI Structure ==================== -->
+
+<!-- Welcome Screen -->
+<div id="welcomeScreen" class="welcome-screen">
+  <!-- Add onkeydown handler to prevent key events from reaching the game -->
+  <div class="welcome-content" onkeydown="handleWelcomeKeydown(event)">
+    <div class="splash-image">
+      <img src="{{CDN_ASSETS_URL}}/ui/images/volcanoDashSplash.jpg" alt="Volcano Dash">
+    </div>
+    <h1>VOLCANO DASH</h1>
+    <p>Work shifts absorbing energy from the lava chamber. <br> <span style="color: #ff3333;">Be careful not to overheat!</span></p>
+    <div class="name-input-container">
+      <input type="text" id="nameInput" class="name-input" placeholder="Enter Name" maxlength="20" onKeyPress="handleEnterKey(event)">
+      <button id="submitName" class="submit-button" onClick="submitName()">Press Enter to Start</button>
+    </div>
+    <br> <p><span class="esc-note">(press esc to unlock mouse)</span></p>
+  </div>
+</div>
+
+<!-- Main Game Interface -->
+<div id="game-ui">
+  <div id="heatClusterNotification" class="heat-cluster-notification"></div>
+  <!-- Stats Container -->
+  <div class="stats-container">
+    <!-- Remove this section
+    <div class="game-stat teleport-info">
+      <span class="stat-label">Teleport Charges:</span>
+      <span id="teleportCharges" class="stat-value">0</span>
+    </div>
+    -->
+  </div>
+
+  <!-- Leaderboards -->
+  <div class="leaderboards-container">
+    <div class="best-shift-box">
+      <div class="leaderboard-title">Your Best Shift</div>
+      <div id="personalBestScore" class="score-value">0</div>
+    </div>
+    <div class="leaderboard-box">
+      <div class="leaderboard-title">Last Shift Leaders</div>
+      <div id="lastShiftLeaders" class="leaderboard-list"></div>
+    </div>
+    <div class="leaderboard-box">
+      <div class="leaderboard-title">All Time Leaders</div>
+      <div id="allTimeLeaders" class="leaderboard-list"></div>
+    </div>
+  </div>
+
+  <!-- Add this new HTML element after the leaderboards-container div -->
+  <div id="shiftWinnerMessage" class="shift-winner-message">
+    <div class="winner-content"></div>
+  </div>
+
+  <!-- Add this after the shiftWinnerMessage div -->
+  <div id="shiftInProgressMessage" class="shift-in-progress-message">
+    <div class="progress-content">Shift in Progress</div>
+  </div>
+
+  <!-- Bottom UI container -->
+  <div class="bottom-ui-container">
+    <div class="score-box">
+      <div class="score-label">Energy Harvested</div>
+      <div class="score-value" id="currentScore">0</div>
+    </div>
+
+    <div class="heat-container">
+      <div class="heat-label">Heat Level</div>
+      <div class="heat-bar-wrapper">
+        <div id="heatBar" class="heat-bar"></div>
+      </div>
+    </div>
+
+    <div id="heatWarning" class="heat-warning" style="display: none;">
+      Heat Level: DANGEROUS
+    </div>
+
+    <div class="teleport-box">
+      <div class="teleport-info">
+        <div class="teleport-label">Teleport [Q]</div>
+        <div class="teleport-value" id="teleportCharges">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="countdownMessage" class="countdown-message"></div> 
+  <div id="centerContainer" class="center-container">
+
+    <!-- Partner Selection -->
+    <div id="partnerSelectionUI" class="center-panel partner-selection" style="display: none;">
+      <div class="partner-selection-content">
+        <h2>Shift Starting Soon!</h2>
+        <h3>Select a partner for this shift. Partners can teleport to each other using Q during the game.</h3>
+        
+        <!-- Move status and request elements here, before the partner list -->
+        <div id="selectionStatus" class="selection-status"></div>
+        <div id="pendingRequest" class="pending-request" style="display: none;">
+          <div class="request-message"></div>
+          <div class="request-buttons">
+            <button class="accept-btn">Accept</button>
+            <button class="reject-btn">Decline</button>
+          </div>
+        </div>
+        
+        <div id="partnerList" class="partner-list"></div>
+        
+        <!-- Add solo button at the bottom -->
+        <div class="no-partner-option">
+          <button class="solo-button" onclick="chooseSolo()">I'll Work Solo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Partnership Confirmation -->
+    <div id="partnershipConfirmation" class="center-panel partnership-confirmation" style="display: none;">
+      <div class="confirmation-message"></div>
+    </div>
+  </div>
+
+  <div id="lavaOverlay" class="lava-overlay"></div>
+
+  <div id="teleportStatus" class="teleport-status"></div>
+
+  <div id="partnerInfo" class="partner-info" style="display: none;">
+    <div class="partner-name"></div>
+    <div class="teleport-charges"></div>
+  </div>
+
+  <div id="countdown" class="countdown"></div>
+
+  <!-- Chat Commands -->
+  <div class="chat-commands">
+    <div class="command">/about</div>
+    <div class="command">/tips</div>
+    <div class="command">/credits</div>
+    <div class="command">/view</div>
+  </div>
+</div>
+
+<!-- Gameplay Overlay Elements -->
+<div id="superChargeUI">
+  <div id="superChargePrompt">Press F to Super Charge your Energy</div>
+  <div id="chargeBar">
+    <div class="charge-fill"></div>
+  </div>
+</div>
+
+<!-- Add this after the superChargeUI div -->
+<div id="teleportMessageUI" class="teleport-message">
+  <div id="teleportMessagePrompt"></div>
+</div>
+
+<!-- Message Templates -->
+<template id="join-npc-message">
+  <div class="join-npc-message">
+    <h1>Join the Next Shift!</h1>
+    <p>Come close to me to grab your gear</p>
+    <p class="controls">(WASD to move, Spacebar to jump)</p>
+  </div>
+</template>
+
+<template id="practice-npc-message">
+  <div class="join-npc-message">
+    <h1>Practice Room ==></h1>
+    <p>Head this way to practice!</p>
+    <p class="controls">(WASD to move, Spacebar to jump)</p>
+  </div>
+</template>
+
+<template id="player-queued">
+  <div class="queued-message">
+    <p style="color: #00FF00;">Ready for next shift!</p>
+  </div>
+</template>
+
+<!-- Game State Overlays -->
+<div id="aboutOverlay" class="overlay" style="display: none;">
+  <div class="overlay-content">
+    <div class="about-text">VOLTECH INDUSTRIES
+
+Voltech is a cutting-edge resource company specalizing in volatile geothermal energy extration.
+
+As a Voltech operator, you will be transported into a high-risk volcanic chamber to siphon raw geothermal energy using a specialized suit.
+
+<strong>The longer you last in the chamber - the more energy you harvest for the company.</strong> We highly recommend working with a partner to maximize your harvest each shift.
+
+Your equpment is designed to handle high levels of heat, but it can only take so much. <strong>If your heat level rises too high, you will be automatically transported out of the chamber.</strong></div>
+    <button id="closeAbout" class="submit-button" onClick="closeAboutOverlay()">Press Enter to Close</button>
+  </div>
+</div>
+
+<!-- Add new Tips Overlay -->
+<div id="tipsOverlay" class="overlay" style="display: none;">
+  <div class="overlay-content">
+    <div class="tips-text">Maximize your Harvest
+
+<strong class="section-header">Work with a Partner</strong>
+Your suit is equipped with two teleport charges that allow you to transport to your partner's location. Use these to get out of danger or strategically navigate to high value locations. <strong>Use Q to teleport.</strong>
+
+<strong class="section-header">Energy Clusters</strong>
+Stand inside of an energy cluster to harvest energy at a faster rate. Stay in these locations as long as possible.
+
+<strong class="section-header">Supercharge Stations</strong>
+Use F at a supercharge station to 2x your harvested energy. Each station can only be used once.
+
+</div>
+    <button id="closeTips" class="submit-button" onClick="closeTipsOverlay()">Press Enter to Close</button>
+  </div>
+</div>
+
+<!-- Add new Credits Overlay -->
+<div id="creditsOverlay" class="overlay" style="display: none;">
+  <div class="overlay-content">
+    <div class="credits-text">Game Credits
+
+Volcano Dash was created by Ashoka (@ashokawashere) for Hytopia Game Jam 1 in February 2025.
+
+<strong class="section-header">Additional Credits</strong>
+Sound FX from the following individuals on Freesound.org:
+<br> scriptro (alient alarm 1a)
+<br> odilonmarcenaro (arming burglar alarm 2)
+<br> neopolitansixth (formant riser)
+<br> sleep (140bpm303swirl)
+<br> joseegn (ui sound return 1)
+<br> lupine elfenia (future ui acquired)
+<br> shelbyshark (space rumble)
+
+</div>
+    <button id="closeCredits" class="submit-button" onClick="closeCreditsOverlay()">Press Enter to Close</button>
+  </div>
+</div>
+
+<!-- Add these new message overlays before the closing body tag -->
+<div id="overheatMessage" class="center-message" style="display: none;">
+  Your Suit Overheated! Extraction Successful
+</div>
+
+<div id="survivalMessage" class="center-message" style="display: none;">
+  Congratulations! You survived the Shift! Transporting...
+</div>
+
+<!-- Add this with the other templates -->
+<template id="heatCluster">
+  <div class="heat-cluster-label">Heat Cluster</div>
+</template>
+
+<!-- Add the corresponding style -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;600&display=swap');
+
+  /* Welcome Screen Styles */
+
+  .welcome-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    transition: opacity 0.5s;
+    pointer-events: all;  /* Ensure welcome screen captures all mouse events */
+  }
+
+  .welcome-content {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 40px 40px 40px 40px;  
+    border-radius: 15px;
+    text-align: center;
+    color: #fff;
+    border: 2px solid #ff6600;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .welcome-content h1 {
+    color: #ff6600;
+    text-align: center;
+    margin: 0 0 20px 0;
+    font-size: 2.5em;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+
+  .welcome-content p {
+    margin-bottom: 30px;
+    line-height: 1.6;
+    font-size: 18px;
+    color: #eee;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  .esc-note {
+    font-style: italic;
+    font-size: 14px;
+    color: #999;
+  }
+
+  .name-input-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .name-input {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 2px solid #ff6600;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    width: 250px;
+    text-align: center;
+    font-size: 18px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .submit-button {
+    padding: 10px 30px;
+    border-radius: 8px;
+    border: none;
+    background: #ff6600;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+  }
+
+  .submit-button:hover {
+    background: #ff8533;
+  }
+
+  .submit-button:disabled {
+    background: #666;
+    cursor: not-allowed;
+  }
+
+  /* Game UI Styles */
+
+  .leaderboards-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .best-shift-box {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    min-width: 200px;
+  }
+
+  .best-shift-box .score-value {
+    color: #ff6600;
+    font-size: 24px;
+    font-weight: bold;
+  }
+
+  .bottom-ui-container {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;  /* Always visible */
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    width: 80%;
+    max-width: 900px;
+  }
+
+  .score-box {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 25px;
+    border-radius: 12px;
+    text-align: center;
+    min-width: 200px;
+  }
+
+  .score-label {
+    color: #ff6600;
+    font-size: 16px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .score-value {
+    color: white;
+    font-size: 28px;
+    font-weight: bold;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .leaderboard-box {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 10px;
+    min-width: 200px;
+  }
+
+  .leaderboard-title {
+    color: #ff6600;
+    font-size: 16px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .leaderboard-list {
+    color: white;
+  }
+
+  .leaderboard-entry {
+    display: flex;
+    justify-content: space-between;
+    margin: 5px 0;
+    font-size: 14px;
+  }
+
+  .leaderboard-entry .name {
+    margin-right: 10px;
+  }
+
+  .leaderboard-entry .score {
+    color: #ff6600;
+  }
+
+  .heat-container {
+    position: static;
+    width: 200px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 25px;
+    border-radius: 12px;
+  }
+
+  .heat-label {
+    color: #ff6600;
+    font-size: 16px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .heat-bar-wrapper {
+    width: 100%;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    margin: 5px 0;
+  }
+
+  .heat-bar {
+    width: 0%;
+    height: 100%;
+    background-color: #ffaa00;
+    transition: width 0.3s ease-out;
+  }
+
+  .countdown-message {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 20px 30px;
+    border-radius: 12px;
+    font-size: 24px;
+    text-align: center;
+    z-index: 1003;
+    pointer-events: none;
+    display: none; /* Hide by default */
+  }
+
+  .countdown-message.visible {
+    display: block; /* Show when visible class is added */
+  }
+
+  .lava-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: red;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .join-npc-message {
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 12px;
+    padding: 12px 20px;
+    color: white;
+    text-align: center;
+    position: relative;
+    margin-bottom: 15px;
+    pointer-events: none;
+  }
+
+  .join-npc-message:after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid rgba(0, 0, 0, 0.8);
+  }
+
+  .join-npc-message h1 {
+    font-size: 24px;
+    color: #ff6600;
+    margin: 0 0 8px 0;
+  }
+
+  .join-npc-message p {
+    font-size: 16px;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .join-npc-message .controls {
+    color: #ccc;
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  /* Super Charge UI Styles */
+
+  #superChargeUI {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 9999;
+    pointer-events: none;
+    width: 100%;
+  }
+  
+  #superChargePrompt {
+    color: white;
+    font-size: 20px;
+    margin: 0 auto 15px;
+    background: rgba(0,0,0,0.7);
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: 2px solid white;
+    display: inline-block;
+  }
+  
+  #chargeBar {
+    width: 200px;
+    height: 10px;
+    background: rgba(255,255,255,0.3);
+    border: 2px solid white;
+    border-radius: 5px;
+    overflow: hidden;
+    display: none;
+    margin: 0 auto;
+  }
+  
+  .charge-fill {
+    width: 0%;
+    height: 100%;
+    background: white;
+    border-radius: 3px;
+    transition: width 0.1s linear;
+  }
+
+  /* Join NPC and Queue Message Styles */
+
+  .queued-message {
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 12px;
+    padding: 12px 20px;
+    color: white;
+    text-align: center;
+    position: relative;
+    margin-bottom: 15px;
+    pointer-events: none;
+  }
+
+  /* Add highlighting for current player in leaderboard */
+  .leaderboard-entry.current-player {
+    background: rgba(255, 102, 0, 0.3);
+    border-radius: 4px;
+    padding: 2px 5px;
+  }
+
+  .heat-cluster-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 20px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    background: rgba(0,0,0,0.7);
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: 2px solid white;
+    display: inline-block;
+  }
+
+  .heat-cluster-notification.active {
+    opacity: 1;
+  }
+
+  /* Add new styles */
+  .partner-selection {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    padding: 25px;
+    border-radius: 12px;
+    border: 2px solid #ff6600;
+    color: white;
+    z-index: 1001;
+    pointer-events: auto; /* Ensure clicks work */
+  }
+
+  .partner-selection h2 {
+    color: #ff6600;
+    margin-bottom: 15px;
+    text-align: center;
+  }
+
+  .partner-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    margin: 8px 0;
+    background: rgba(255, 102, 0, 0.1);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    pointer-events: auto; /* Ensure clicks work */
+  }
+
+  .partner-option:hover {
+    background: rgba(255, 102, 0, 0.2);
+    border-color: #ff6600;
+  }
+
+  .partner-info {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 12px 20px;
+    border-radius: 8px;
+    color: white;
+    border: 1px solid #ff6600;
+  }
+
+  .selection-status {
+    padding: 10px;
+    margin-top: 15px;
+    border-radius: 5px;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  .fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .teleport-status {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 20px;
+    border-radius: 5px;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .teleport-status.success {
+    background: rgba(0, 255, 0, 0.8);
+  }
+
+  .teleport-status.noPartner,
+  .teleport-status.noCharges,
+  .teleport-status.invalidPartner {
+    background: rgba(255, 0, 0, 0.8);
+  }
+
+  .selection-status {
+    padding: 10px;
+    margin-top: 15px;
+    border-radius: 5px;
+    text-align: center;
+  }
+
+  .selection-status.error {
+    background: rgba(255, 0, 0, 0.2);
+    color: #ff4444;
+  }
+
+  .selection-status.success {
+    background: rgba(0, 255, 0, 0.2);
+    color: #44ff44;
+  }
+
+  .selection-status.pending {
+    background: rgba(255, 165, 0, 0.2);
+    color: #ffa500;
+  }
+
+  .pending-request {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(255, 165, 0, 0.1);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .request-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  .request-buttons button {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .accept-btn {
+    background: #00aa00;
+    color: white;
+  }
+
+  .reject-btn {
+    background: #aa0000;
+    color: white;
+  }
+
+  .accept-btn:hover { background: #00cc00; }
+  .reject-btn:hover { background: #cc0000; }
+
+  /* Update to match existing game-stat styling */
+  .game-stat.teleport-info {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 15px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 1000; /* Make sure it's visible above other elements */
+  }
+
+  .teleport-info .stat-label {
+    color: #ff6600;
+    font-size: 16px;
+    text-transform: uppercase;
+  }
+
+  .teleport-info .stat-value {
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+  }
+
+  .stats-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .game-stat {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+  }
+
+  .game-stat.teleport-info {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 15px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 1000;
+  }
+
+  .stat-label {
+    color: #ff6600;
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+  }
+
+  .teleport-info .stat-label {
+    font-size: 16px;
+  }
+
+  .teleport-info .stat-value {
+    font-size: 20px;
+  }
+
+  .no-partners {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    font-style: italic;
+  }
+
+  /* Add this to ensure the game UI doesn't block partner selection */
+  #game-ui {
+    pointer-events: none; /* Allow clicks to pass through to partner UI */
+  }
+
+  /* But allow clicks on specific game UI elements that need them */
+  .game-stat,
+  .leaderboard-box,
+  .bottom-ui-container {
+    pointer-events: auto;
+  }
+
+  /* Add after the #superChargeUI styles */
+  #teleportMessageUI {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 9999;
+    pointer-events: none;
+    width: 100%;
+  }
+
+  #teleportMessagePrompt {
+    color: white;
+    font-size: 20px;
+    margin: 0 auto 15px;
+    background: rgba(0,0,0,0.7);
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: 2px solid white;
+    display: inline-block;
+  }
+
+  .partnership-confirmation {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    padding: 25px 40px;
+    border-radius: 12px;
+    text-align: center;
+    z-index: 1002;
+    animation: fadeInOut 3s forwards;
+    /* Match other messages */
+    border: 2px solid #ff6600;
+    color: #ff6600;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  @keyframes fadeInOut {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Update the center container and panel styles */
+  .center-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;  /* Add height to ensure full coverage */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .center-panel {
+    pointer-events: auto;
+    position: absolute;  /* This ensures panels stack */
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);  /* Center the panel */
+    width: auto;        /* Let content determine width */
+    max-width: 500px;   /* But don't get too wide */
+  }
+
+  /* Ensure each panel takes up appropriate space */
+  .partner-selection {
+    width: 90%;         /* Take up most of the width on mobile */
+    max-width: 500px;   /* But not too wide on desktop */
+  }
+
+  .partnership-confirmation,
+  .countdown-message {
+    width: auto;        /* Let content determine width */
+    min-width: 300px;   /* But ensure minimum readable width */
+  }
+
+  /* Keep existing z-index values */
+  .partner-selection { z-index: 1001; }
+  .partnership-confirmation { z-index: 1002; }
+  .countdown-message { z-index: 1003; }
+
+  .partner-list {
+    max-height: 300px;  /* Set maximum height */
+    overflow-y: auto;   /* Enable vertical scrolling */
+    padding-right: 10px; /* Prevent scrollbar from overlapping content */
+  }
+
+  /* Style the scrollbar for better appearance */
+  .partner-list::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .partner-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  .partner-list::-webkit-scrollbar-thumb {
+    background: #ff6600;
+    border-radius: 4px;
+  }
+
+  .partner-list::-webkit-scrollbar-thumb:hover {
+    background: #ff8533;
+  }
+
+  .teleport-box {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 25px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 60px;
+    min-width: 160px;
+  }
+
+  .teleport-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;  /* Prevent text from wrapping */
+  }
+
+  .teleport-label {
+    color: #ff6600;
+    font-size: 16px;
+    text-transform: uppercase;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .teleport-value {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .no-partner-option {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 102, 0, 0.3);
+    text-align: center;
+  }
+
+  .solo-button {
+    background: rgba(0, 0, 0, 0.7);
+    color: #ffffff;
+    border: 2px solid #ff6600;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 20px;
+  }
+
+  .solo-button:hover {
+    background: rgba(255, 102, 0, 0.2);
+  }
+
+  .solo-description {
+    display: block;
+    color: #999;
+    font-size: 14px;
+    margin-top: 8px;
+  }
+
+  .splash-image {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto 30px;  /* Increased bottom margin for more space */
+  }
+
+  .splash-image img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+
+  /* Add this to prevent mouse events from reaching the game UI while welcome screen is visible */
+  
+  #game-ui {
+    pointer-events: none;
+  }
+
+  /* Re-enable pointer events after welcome screen is hidden */
+
+  #welcomeScreen[style*="display: none"] + #game-ui {
+    pointer-events: auto;
+  }
+
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    transition: opacity 0.5s;
+  }
+
+  .overlay-content {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 40px;
+    border-radius: 15px;
+    text-align: center;
+    color: #fff;
+    border: 2px solid #ff6600;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .about-text {
+    white-space: pre-line;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    font-size: 18px;
+    color: #eee;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  .about-text::first-line {
+    color: #ff6600;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .about-text strong {
+    color: #ff8533;
+  }
+
+  .tips-text {
+    white-space: pre-line;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    font-size: 18px;
+    color: #eee;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  .tips-text::first-line {
+    color: #ff6600;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .tips-text strong {
+    color: #ff8533;
+  }
+
+  .tips-text strong.section-header {
+    display: block;
+    margin-top: 20px;
+    margin-bottom: 5px;
+  }
+
+  .credits-text {
+    white-space: pre-line;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    font-size: 14px;
+    color: #eee;
+
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  .credits-text::first-line {
+    color: #ff6600;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .credits-text strong {
+    color: #ff8533;
+  }
+
+  .credits-text strong.section-header {
+    display: block;
+    margin-top: 20px;
+    margin-bottom: 5px;
+  }
+
+
+  .chat-commands {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 102, 0, 0.3);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    z-index: 1000;
+  }
+
+  .command {
+    color: #ff6600;
+    font-size: 14px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    text-align: left;
+  }
+
+  .command:hover {
+    color: #ff8533;
+  }
+
+  .heat-warning {
+    position: fixed;  /* Change from absolute to fixed */
+    bottom: 140px;   /* Position it above the heat bar */
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    text-align: center;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+    animation: pulse 1s infinite;
+    font-family: 'Orbitron', sans-serif;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 1001;  /* Ensure it appears above other UI elements */
+  }
+
+  @keyframes pulse {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+  }
+
+  .center-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #ff6600;
+    padding: 25px 40px;
+    border-radius: 12px;
+    border: 2px solid #ff6600;
+    font-size: 24px;
+    text-align: center;
+    z-index: 1000;
+    font-family: 'Orbitron', sans-serif;
+    animation: fadeIn 0.5s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .partner-selection-content h2 {
+    color: #ff6600;
+    text-align: center;
+    margin: 0 0 20px 0;
+    font-size: 2.5em;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+
+  .partner-selection-content h3 {
+    margin-bottom: 30px;
+    line-height: 1.6;
+    font-size: 18px;
+    color: #eee;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  .partner-selection {
+    background: rgba(0, 0, 0, 0.9);
+    padding: 40px;
+    border-radius: 15px;
+    border: 2px solid #ff6600;
+    max-width: 500px;
+  }
+
+  /* Update the solo button to match other buttons */
+  .solo-button {
+    background: rgba(0, 0, 0, 0.7);
+    color: #ffffff;
+    border: 2px solid #ff6600;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 20px;
+  }
+
+  .solo-button:hover {
+    background: rgba(255, 102, 0, 0.2);
+  }
+
+  .confirmation-message {
+    color: #ff6600;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .heat-cluster-label {
+    background: rgba(0, 0, 0, 0.8);
+    color: #ff6600;
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-size: 14px;
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+    pointer-events: none;
+  }
+
+  .shift-winner-message {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #ff6600;
+    border-radius: 12px;
+    padding: 20px 30px;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+    text-align: center;
+    max-width: 300px;
+  }
+
+  .shift-winner-message .winner-content {
+    font-size: 18px;
+    line-height: 1.4;
+  }
+
+  .shift-winner-message .winner-name {
+    color: #ff6600;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    display: block;
+    margin: 8px 0;
+  }
+
+  .shift-in-progress-message {
+    position: fixed;
+    left: 20px;  /* Changed from right: 20px to left: 20px */
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #ff6600;
+    border-radius: 12px;
+    padding: 15px 20px;  /* Reduced padding */
+    color: #ff6600;
+    font-family: 'Orbitron', sans-serif;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  .shift-in-progress-message.visible {
+    opacity: 1;
+  }
+
+  .progress-content {
+    color: #ff6600;
+    font-size: 18px;  /* Reduced from 24px */
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    letter-spacing: 1px;  /* Reduced from 2px */
+  }
+</style>
+
+
+  
+  
+  
+  
