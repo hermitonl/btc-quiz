@@ -345,7 +345,7 @@ startServer(world => {
     const playerEntity = new PlayerEntity({
       player,
       name: player.username, // Use player's username for the entity name
-      modelUri: 'models/players/player.gltf', // Use default player model
+      modelUri: 'models/players/robocop.gltf', // Use default player model
       // modelLoopedAnimations: ['idle'], // Optional: Add if model has idle animation
       // modelScale: 0.5, // Optional: Adjust scale if needed
     });
