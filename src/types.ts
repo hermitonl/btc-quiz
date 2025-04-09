@@ -23,6 +23,7 @@ export interface InMemoryPlayerState {
     activeQuiz: ActiveQuizState | null; // Track the current quiz state
     isGuest: boolean; // Flag to indicate if player data was loaded from DB
     isAuthenticated: boolean; // Flag to indicate if the player has successfully logged in
+    loggedInUsername: string | null; // Stores the username the player is authenticated as, null if guest/not logged in
 }
 
 // --- Shared Definitions ---
