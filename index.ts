@@ -6,36 +6,32 @@ import {
   Vector3,
   World,
   Player,
-  Entity, // Import Entity
-  // Raycast is not directly imported, use world.raycast
-  // Input, // Removed unused import
-  RigidBodyType, // Import RigidBodyType
-  ColliderShape, // Import ColliderShape
-  BlockType, // Import BlockType
-  ChatEvent, // Import ChatEvent
+  Entity,
+  RigidBodyType,
+  ColliderShape,
+  BlockType,
+  ChatEvent,
+  // ChatEventArgs, // Removed - Not an exported type
 } from 'hytopia';
 
-import worldMap from './assets/maps/boilerplate.json'; // Use the specified boilerplate map
-import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database'; // Import DB functions
-import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState } from './src/types'; // Import types
+import worldMap from './assets/maps/boilerplate.json';
+import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database';
+import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState } from './src/types';
 
-// --- Lesson & Quiz Data (Using types from types.ts) ---
-// Definitions moved to src/types.ts
-
+// --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
   { id: 'lesson1', npcName: 'InfoSkeleton', text: 'Bitcoin is a decentralized digital currency, meaning no single entity controls it.', reward: 1 },
   { id: 'lesson2', npcName: 'DataBones', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
   { id: 'lesson3', npcName: 'InfoSkeleton', text: 'New bitcoins are created through a process called mining.', reward: 1 },
 ];
 
-// Updated quizzes array with questions
 const quizzes: Quiz[] = [
   {
     id: 'quiz1',
     npcName: 'QuizMind',
     topic: 'Bitcoin Basics',
     cost: 1,
-    reward: 10, // Add reward
+    reward: 10,
     questions: [
       { q: 'What is Bitcoin primarily known as?', a: ['A physical coin', 'A decentralized digital currency', 'A government-backed asset'], correct: 'A decentralized digital currency' },
       { q: 'What is the maximum supply of Bitcoin?', a: ['100 Million', 'Unlimited', '21 Million'], correct: '21 Million' },
@@ -47,7 +43,7 @@ const quizzes: Quiz[] = [
     npcName: 'QuizMind',
     topic: 'Blockchain Fundamentals',
     cost: 2,
-    reward: 10, // Add reward
+    reward: 10,
     questions: [
         { q: 'What is a block in a blockchain?', a: ['A type of cryptocurrency', 'A collection of transactions', 'A mining computer'], correct: 'A collection of transactions' },
         { q: 'How are blocks linked together?', a: ['With physical chains', 'Through cryptographic hashes', 'By email'], correct: 'Through cryptographic hashes' },
@@ -56,363 +52,356 @@ const quizzes: Quiz[] = [
 ];
 
 // --- State Management ---
-// --- State Management (Using types from types.ts) ---
-// Definitions for ActiveQuizState and PlayerState (now InMemoryPlayerState) moved to src/types.ts
-// Map to track player state (using player.id as the key)
-const playerStates = new Map<string, InMemoryPlayerState>();
+const playerStates = new Map<string, InMemoryPlayerState>(); // Key: player.username
 
 // --- NPC Management ---
 interface NpcInfo {
     type: 'knowledge' | 'quiz';
-    dataId: string; // Corresponds to Lesson.id or Quiz.id
+    dataId: string;
 }
 const npcs = new Map<number, NpcInfo>(); // Key: Entity ID
 
 // --- Helper Functions ---
-function updateSats(playerId: string, amount: number): boolean {
-    const state = playerStates.get(playerId);
+function updateSats(username: string, amount: number): boolean {
+    const state = playerStates.get(username);
     if (!state) {
-        console.warn(`Attempted to update sats for unknown player ID: ${playerId}`);
+        console.warn(`Attempted to update sats for unknown player username: ${username}`);
         return false;
     }
     const newSats = state.sats + amount;
     if (newSats < 0) {
-        // Optional: Send message to player they don't have enough sats
-        // world.chatManager.sendPlayerMessage(...)
-        console.log(`Player ${playerId} attempted transaction resulting in negative sats (${newSats}). Denied.`);
-        return false; // Indicate transaction failed
+        console.log(`Player ${username} attempted transaction resulting in negative sats (${newSats}). Denied.`);
+        return false;
     }
     state.sats = newSats;
-    playerStates.set(playerId, state); // Update the map
-    console.log(`Updated sats for player ${playerId}. New balance: ${state.sats}`);
-    // Optional: Update player UI if displaying sats
-    return true; // Indicate transaction succeeded
+    playerStates.set(username, state);
+    console.log(`Updated sats for player ${username}. New balance: ${state.sats}`);
+    return true;
 }
+
 // --- Quiz Logic Functions ---
-
-// Function to ask the next question or end the quiz
 function askQuestion(world: World, player: Player, quizId: string, questionIndex: number) {
-    const playerId = player.id;
-    if (playerId === undefined) return; // Should not happen
-
-    const playerState = playerStates.get(playerId);
+    const username = player.username;
+    const playerState = playerStates.get(username);
     const quiz = quizzes.find(q => q.id === quizId);
 
     if (!playerState || !quiz || !playerState.activeQuiz || playerState.activeQuiz.quizId !== quizId) {
-        console.error(`askQuestion called with invalid state for player ${player.username} (ID: ${playerId}), quizId: ${quizId}`);
-        // Attempt to clear any lingering quiz state just in case
+        console.error(`askQuestion called with invalid state for player ${username}, quizId: ${quizId}`);
         if (playerState && playerState.activeQuiz) {
              if (playerState.activeQuiz.timerId) clearTimeout(playerState.activeQuiz.timerId);
              playerState.activeQuiz = null;
+             playerStates.set(username, playerState); // Update state if cleared
         }
         return;
     }
 
-    // Check if quiz is finished
     if (questionIndex >= quiz.questions.length) {
-        endQuiz(world, player, quizId, true); // Player won
+        endQuiz(world, player, quizId, true);
         return;
     }
 
-    // Get the current question *after* the bounds check
     const question = quiz.questions[questionIndex];
-
-    // Explicitly check if the question exists (to satisfy TS and handle potential data issues)
     if (!question) {
-        console.error(`Could not find question at index ${questionIndex} for quiz ${quizId}, although index is within bounds.`);
+        console.error(`Could not find question at index ${questionIndex} for quiz ${quizId}.`);
         world.chatManager.sendPlayerMessage(player, `[System]: Error loading question ${questionIndex + 1}. Ending quiz.`, 'FF0000');
-        endQuiz(world, player, quizId, false); // End quiz due to error
+        endQuiz(world, player, quizId, false);
         return;
     }
 
-    // Now we know 'question' is valid, update the state and send messages
     playerState.activeQuiz.questionIndex = questionIndex;
 
     let answerText = question.a.map((ans, index) => `${index + 1}. ${ans}`).join('\n');
-    world.chatManager.sendPlayerMessage(player, `Question ${questionIndex + 1}/${quiz.questions.length}: ${question.q}`, 'FFFFFF'); // White
-    world.chatManager.sendPlayerMessage(player, answerText, 'ADD8E6'); // Light Blue
-    world.chatManager.sendPlayerMessage(player, `Type /a <number> within 30 seconds!`, 'FFFF00'); // Yellow
+    world.chatManager.sendPlayerMessage(player, `Question ${questionIndex + 1}/${quiz.questions.length}: ${question.q}`, 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, answerText, 'ADD8E6');
+    world.chatManager.sendPlayerMessage(player, `Type /a <number> within 30 seconds!`, 'FFFF00');
 
-    // Clear previous timer if any (safety measure)
     if (playerState.activeQuiz.timerId) {
         clearTimeout(playerState.activeQuiz.timerId);
     }
 
-    // Start the timer
     playerState.activeQuiz.timerId = setTimeout(() => {
-        // Re-fetch state inside the timer callback to ensure it's current
-        const currentState = playerStates.get(playerId);
-        // Check if the player is STILL in the same quiz and on the SAME question
+        const currentState = playerStates.get(username);
         if (currentState?.activeQuiz?.quizId === quizId && currentState.activeQuiz.questionIndex === questionIndex) {
-            world.chatManager.sendPlayerMessage(player, "Time's up!", 'FF0000'); // Red
-            endQuiz(world, player, quizId, false); // Player lost due to timeout
+            world.chatManager.sendPlayerMessage(player, "Time's up!", 'FF0000');
+            endQuiz(world, player, quizId, false);
         }
-        // If the state changed (e.g., player answered correctly/incorrectly, or started another quiz), the timer does nothing.
-    }, 30 * 1000); // 30 seconds
+    }, 30 * 1000);
 
-    playerStates.set(playerId, playerState); // Ensure state map is updated with timerId and index
+    playerStates.set(username, playerState);
 }
 
-// Function to end the quiz
 function endQuiz(world: World, player: Player, quizId: string, won: boolean) {
-    const playerId = player.id;
-    if (playerId === undefined) return;
-
-    const playerState = playerStates.get(playerId);
-    const quiz = quizzes.find(q => q.id === quizId); // Find quiz for context (e.g., topic name)
+    const username = player.username;
+    const playerState = playerStates.get(username);
+    const quiz = quizzes.find(q => q.id === quizId);
 
     if (!playerState || !playerState.activeQuiz || playerState.activeQuiz.quizId !== quizId) {
-        // Player might not be in this quiz anymore, or state is inconsistent. Log and exit.
-        console.warn(`endQuiz called for player ${player.username} (ID: ${playerId}) for quiz ${quizId}, but they are not actively in it.`);
+        console.warn(`endQuiz called for player ${username} for quiz ${quizId}, but they are not actively in it.`);
         return;
     }
 
-    // Clear the timer if it's still active
     if (playerState.activeQuiz.timerId) {
         clearTimeout(playerState.activeQuiz.timerId);
     }
 
-    // Clear the active quiz state
-    playerState.activeQuiz = null;
+    playerState.activeQuiz = null; // Clear active quiz state first
 
     if (won) {
         playerState.completedQuizzes.add(quizId);
-        const reward = 10;
-        if (updateSats(playerId, reward)) {
-            world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Complete! You earned ${reward} sats. Your balance: ${playerState.sats} sats.`, '00FF00'); // Green
+        const reward = quiz?.reward ?? 10;
+        if (updateSats(username, reward)) {
+            world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Complete! You earned ${reward} sats. Your balance: ${playerState.sats} sats.`, '00FF00');
         } else {
-             world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Complete! Failed to award sats.`, 'FF0000'); // Red
+             world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Complete! Failed to award sats.`, 'FF0000');
         }
     } else {
-        // Sats were already deducted at the start
-        world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Failed. You lost the entry cost.`, 'FF0000'); // Red
+        world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Failed. You lost the entry cost.`, 'FF0000');
     }
 
-    playerStates.set(playerId, playerState); // Update the map with cleared activeQuiz and potentially added completedQuiz
+    playerStates.set(username, playerState); // Update state map
 }
 
-
-// Removed external spawnNpc function. Spawning logic moved inline into JOINED_WORLD event.
-// Removed external spawnNpc function. Spawning logic moved inline into JOINED_WORLD event.
-
 // --- Server Start ---
-startServer(async world => { // Make the callback async
-  // Initialize Database first
+startServer(async world => {
   try {
     await initializeDatabase();
   } catch (error) {
     console.error("FATAL: Database initialization failed. Server cannot start.", error);
-    process.exit(1); // Stop the server if DB init fails
+    process.exit(1);
   }
 
-  // world.simulation.enableDebugRendering(true); // Keep commented out
-
   world.loadMap(worldMap);
-  // TODO: Replace with actual cyberpunk plaza map later
 
-  // --- Spawn NPCs (Minimal, in startServer scope) ---
+  // --- Spawn NPCs ---
   try {
-      // --- InfoSkeleton ---
-      const infoSkeleton = new Entity({
-          modelUri: 'models/npcs/skeleton.gltf', // Use original skeleton model
-          // position removed from constructor
-          // name: 'InfoSkeleton', // Keep commented for now
-          rigidBodyOptions: {
-              type: RigidBodyType.FIXED, // Use FIXED instead of STATIC
-              colliders: [
-                  // Physical collider to prevent falling
-                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 },
-                  // Sensor collider for interaction
-                  {
-                      shape: ColliderShape.CYLINDER,
-                      radius: 1.5, // Larger radius for interaction zone
-                      halfHeight: 1.5,
-                      isSensor: true,
-                      tag: 'interaction-sensor',
-                      onCollision: (other: Entity | BlockType, started: boolean) => { // Type should be correct now
-                          // Trigger only when collision starts and the other entity is a PlayerEntity
-                          if (started && other instanceof PlayerEntity && other.player) {
-                              handleNpcInteraction(world, other.player, infoSkeleton.id);
+      const spawnNpc = (config: { model: string, pos: {x: number, y: number, z: number}, type: 'knowledge' | 'quiz', dataId: string, name: string }) => {
+          const npcEntity = new Entity({
+              modelUri: config.model,
+              rigidBodyOptions: {
+                  type: RigidBodyType.FIXED,
+                  colliders: [
+                      { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 }, // Physical
+                      { // Interaction Sensor
+                          shape: ColliderShape.CYLINDER, radius: 1.5, halfHeight: 1.5, isSensor: true, tag: 'interaction-sensor',
+                          onCollision: (other: Entity | BlockType, started: boolean) => {
+                              if (started && other instanceof PlayerEntity && other.player) {
+                                  handleNpcInteraction(world, other.player, npcEntity.id);
+                              }
                           }
                       }
-                  }
-              ]
+                  ]
+              }
+          });
+          npcEntity.spawn(world, config.pos);
+          if (npcEntity.id !== undefined) {
+              npcs.set(npcEntity.id, { type: config.type, dataId: config.dataId });
+              console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) associated with ${config.dataId}`);
+          } else {
+               console.error(`Failed to get ID for spawned NPC: ${config.name}`);
+               if (npcEntity.world) npcEntity.despawn();
           }
-      });
-      // Pass position as second argument to spawn
-      infoSkeleton.spawn(world, { x: 5, y: 3, z: 5 }); // Lower spawn height
-      if (infoSkeleton.id !== undefined) {
-          npcs.set(infoSkeleton.id, { type: 'knowledge', dataId: 'lesson1' });
-          console.log(`Spawned knowledge NPC: InfoSkeleton (ID: ${infoSkeleton.id})`);
-      } else {
-           console.error(`Failed to get ID for spawned NPC: InfoSkeleton`);
-           if (infoSkeleton.world) infoSkeleton.despawn();
-      }
+      };
 
-      // --- DataBones ---
-      const dataBones = new Entity({
-          modelUri: 'models/npcs/skeleton.gltf',
-          // position removed from constructor
-          // name: 'DataBones', // Keep commented for now
-          rigidBodyOptions: {
-              type: RigidBodyType.FIXED, // Use FIXED instead of STATIC
-              colliders: [
-                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 },
-                  {
-                      shape: ColliderShape.CYLINDER,
-                      radius: 1.5,
-                      halfHeight: 1.5,
-                      isSensor: true,
-                      tag: 'interaction-sensor',
-                      onCollision: (other: Entity | BlockType, started: boolean) => { // Type should be correct now
-                          if (started && other instanceof PlayerEntity && other.player) {
-                              handleNpcInteraction(world, other.player, dataBones.id);
-                          }
-                      }
-                  }
-              ]
-          }
-      });
-      dataBones.spawn(world, { x: -5, y: 3, z: 5 }); // Lower spawn height
-      if (dataBones.id !== undefined) {
-          npcs.set(dataBones.id, { type: 'knowledge', dataId: 'lesson2' });
-          console.log(`Spawned knowledge NPC: DataBones (ID: ${dataBones.id})`);
-      } else {
-           console.error(`Failed to get ID for spawned NPC: DataBones`);
-         if (dataBones.world) dataBones.despawn();
-      }
+      spawnNpc({ model: 'models/npcs/skeleton.gltf', pos: { x: 5, y: 3, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
+      spawnNpc({ model: 'models/npcs/skeleton.gltf', pos: { x: -5, y: 3, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', pos: { x: 0, y: 3, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
 
-      // --- QuizMind ---
-      const quizMind = new Entity({
-          modelUri: 'models/npcs/mindflayer.gltf',
-          // position removed from constructor
-          // name: 'QuizMind', // Keep commented for now
-          rigidBodyOptions: {
-              type: RigidBodyType.FIXED, // Use FIXED instead of STATIC
-              colliders: [
-                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 },
-                  {
-                      shape: ColliderShape.CYLINDER,
-                      radius: 1.5,
-                      halfHeight: 1.5,
-                      isSensor: true,
-                      tag: 'interaction-sensor',
-                      onCollision: (other: Entity | BlockType, started: boolean) => { // Type should be correct now
-                          if (started && other instanceof PlayerEntity && other.player) {
-                              handleNpcInteraction(world, other.player, quizMind.id);
-                          }
-                      }
-                  }
-              ]
-          }
-      });
-      quizMind.spawn(world, { x: 0, y: 3, z: -5 }); // Lower spawn height
-      if (quizMind.id !== undefined) {
-          // Associate QuizMind with the first quiz by default on spawn
-          npcs.set(quizMind.id, { type: 'quiz', dataId: 'quiz1' });
-          console.log(`Spawned quiz NPC: QuizMind (ID: ${quizMind.id}) associated with quiz1`);
-      } else {
-           console.error(`Failed to get ID for spawned NPC: QuizMind`);
-         if (quizMind.world) quizMind.despawn();
-      }
   } catch (error) {
-      console.error("Error during initial NPC spawning:", error); // Keep this for debugging
+      console.error("Error during initial NPC spawning:", error);
   }
 
   // --- Player Join Logic ---
-  world.on(PlayerEvent.JOINED_WORLD, async ({ player, world }) => { // Make the handler async
+  world.on(PlayerEvent.JOINED_WORLD, async ({ player, world }) => {
     const playerEntity = new PlayerEntity({
       player,
-      name: player.username, // Use player's username for the entity name
-      modelUri: 'models/players/robocop.gltf', // Use default player model
-      // modelLoopedAnimations: ['idle'], // Optional: Add if model has idle animation
-      // modelScale: 0.5, // Optional: Adjust scale if needed
+      name: player.username,
+      modelUri: 'models/players/robocop.gltf',
     });
-
-    // Spawn the player entity at the specified starting location
-    // Adjust Y coordinate (5) if needed based on the boilerplate map's ground level
     playerEntity.spawn(world, new Vector3(0, 5, 0));
 
-    // Initialize player sat balance AFTER spawning and confirming ID
-    if (playerEntity.player?.id === undefined) {
-        console.error(`Player entity for ${player.username} has no player ID after spawn. Cannot track state.`);
-        // Attempt to despawn if possible, though spawn might have failed
-        if (playerEntity.world) playerEntity.despawn();
-        return; // Stop processing this player
-    }
+    // Use username as the key
+    const username = player.username;
 
-    const playerId = playerEntity.player.id;
+    console.log(`Loading data for player ${username}...`);
+    const loadedState = await loadPlayerData(username);
+    playerStates.set(username, loadedState);
+    console.log(`Player ${username} joined. Initial state loaded/set:`, loadedState);
 
-    // Load player data from DB
-    console.log(`Loading data for player ${player.username} (ID: ${playerId})...`);
-    const loadedState = await loadPlayerData(playerId);
-    playerStates.set(playerId, loadedState);
-    console.log(`Player ${player.username} (ID: ${playerId}) joined. Initial state loaded/set:`, loadedState);
-
-    // Send welcome messages
-    world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00'); // Green
-    world.chatManager.sendPlayerMessage(player, `Your current balance: ${loadedState.sats} sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00'); // Yellow
-    // Removed delayed NPC spawning logic
-
-// Optional: Load UI if needed later
-// player.ui.load('ui/some-ui.html');
-
-}); // END JOINED_WORLD
+    world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
+    world.chatManager.sendPlayerMessage(player, `Your current balance: ${loadedState.sats} sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00');
+  });
 
   // --- Player Leave Logic ---
-  world.on(PlayerEvent.LEFT_WORLD, async ({ player }) => { // Make the handler async
-    // Clear any active quiz timer if the player leaves mid-quiz
-    const playerId = player.id;
-    if (playerId !== undefined) {
-        const playerState = playerStates.get(playerId);
-        if (playerState?.activeQuiz?.timerId) {
-            clearTimeout(playerState.activeQuiz.timerId);
-            console.log(`Cleared active quiz timer for leaving player ${player.username}`);
-        }
+  world.on(PlayerEvent.LEFT_WORLD, async ({ player, world }) => { // Add world back
+    const username = player.username;
+
+    // Clear active quiz timer
+    const playerState = playerStates.get(username);
+    if (playerState?.activeQuiz?.timerId) {
+        clearTimeout(playerState.activeQuiz.timerId);
+        console.log(`Cleared active quiz timer for leaving player ${username}`);
     }
 
-    // Despawn all entities associated with the player
+    // Despawn player entities
     const entitiesToDespawn = world.entityManager.getPlayerEntitiesByPlayer(player);
-    console.log(`Player ${player.username} left. Despawning ${entitiesToDespawn.length} associated entities.`);
+    console.log(`Player ${username} left. Despawning ${entitiesToDespawn.length} associated entities.`);
     entitiesToDespawn.forEach(entity => {
         if (entity.world) {
-             console.log(`Despawning entity ${entity.id} for leaving player ${player.username}`);
+             console.log(`Despawning entity ${entity.id} for leaving player ${username}`);
              entity.despawn();
         }
     });
 
-    // Save player state before removing from memory
-    if (playerId !== undefined) {
-        const finalState = playerStates.get(playerId);
-        if (finalState) {
-            console.log(`Saving final state for player ${player.username} (ID: ${playerId})...`);
-            await savePlayerData(playerId, finalState);
-        } else {
-            console.warn(`Could not find final state for leaving player ${player.username} (ID: ${playerId}) to save.`);
-        }
-
-        // Remove player state from memory AFTER attempting to save
-        if (playerStates.delete(playerId)) {
-            console.log(`Removed in-memory state for player ${player.username} (ID: ${playerId}).`);
-        } else {
-             // This warning might be redundant if the 'finalState' check above already warned
-             console.warn(`Attempted to remove state for player ${player.username} (ID: ${playerId}), but it was already gone.`);
+    // Save player state
+    const finalState = playerStates.get(username); // Re-get state in case it changed during despawn? (unlikely but safe)
+    if (finalState) {
+        console.log(`Saving final state for player ${username}...`);
+        try {
+            await savePlayerData(username, finalState);
+        } catch (saveError) {
+            console.error(`Failed to save data for player ${username} on leave:`, saveError);
         }
     } else {
-        console.error(`Leaving player ${player.username} has undefined ID. Cannot save or remove state.`);
+        console.warn(`Could not find final state for leaving player ${username} to save.`);
     }
-  }); // END LEFT_WORLD
 
-  // --- Ambient Audio (Optional) ---
-  // Keep or modify as needed for the new game's atmosphere
+    // Remove player state from memory AFTER saving attempt
+    if (playerStates.delete(username)) {
+        console.log(`Removed in-memory state for player ${username}.`);
+    } else {
+         console.warn(`Attempted to remove state for player ${username}, but it was already gone.`);
+    }
+  });
+
+  // --- Ambient Audio ---
   new Audio({
-    uri: 'audio/music/hytopia-main.mp3', // Consider changing this later
+    uri: 'audio/music/hytopia-main.mp3',
     loop: true,
     volume: 0.1,
   }).play(world);
 
-// --- NPC Interaction Logic (Called by Sensor Colliders) ---
+  // --- Chat Command Handling ---
+  // Type annotation removed, types will be inferred or default to any
+  // World is accessed from the outer scope, not event args
+  world.chatManager.on(ChatEvent.BROADCAST_MESSAGE, ({ player, message }) => {
+      if (!player) return;
+      const username = player.username;
+      const playerState = playerStates.get(username); // Get state once for this handler
+
+      if (!playerState) {
+          // This might happen if a message comes through before JOINED_WORLD completes fully
+          console.warn(`Received chat message from player ${username} but state not found.`);
+          // Optionally send a message back telling them to wait or rejoin
+          // world.chatManager.sendPlayerMessage(player, `[System]: Still initializing your state, please wait a moment.`, 'FFA500');
+          return;
+      }
+
+      // --- /q (start quiz) Command ---
+      if (message.startsWith('/q ')) {
+          let rawQuizArg = message.substring('/q '.length).trim();
+          let quizId = rawQuizArg;
+          if (/^q\d+$/.test(rawQuizArg)) {
+              quizId = 'quiz' + rawQuizArg.substring(1);
+          }
+
+          const quiz = quizzes.find(q => q.id === quizId);
+
+          if (!quiz) {
+              world.chatManager.sendPlayerMessage(player, `Quiz with ID "${quizId}" not found.`, 'FF0000');
+              return;
+          }
+
+          if (playerState.completedQuizzes.has(quizId)) {
+              world.chatManager.sendPlayerMessage(player, `You have already completed the "${quiz.topic}" quiz!`, 'FFFF00');
+          } else if (playerState.activeQuiz) {
+              world.chatManager.sendPlayerMessage(player, 'You are already in a quiz! Finish it first.', 'FFA500');
+          } else if (updateSats(username, -quiz.cost)) { // Attempt to deduct cost using username
+              world.chatManager.sendPlayerMessage(player, `Starting quiz "${quiz.topic}"... Cost: ${quiz.cost} sats deducted. Your balance: ${playerState.sats} sats.`, '00FF00');
+              // Start the quiz
+              playerState.activeQuiz = {
+                  quizId: quizId,
+                  questionIndex: 0,
+                  timerId: null,
+                  score: 0
+              };
+              playerStates.set(username, playerState); // Update state map
+              askQuestion(world, player, quizId, 0); // Ask the first question
+          } else {
+              // updateSats failed (insufficient funds)
+              world.chatManager.sendPlayerMessage(player, `You don't have enough sats to start the "${quiz.topic}" quiz. Cost: ${quiz.cost} sats. You have: ${playerState.sats} sats.`, 'FF0000');
+          }
+      }
+
+      // --- /a (answer quiz) Command ---
+      else if (message.startsWith('/a ')) {
+          const activeQuiz = playerState.activeQuiz; // Use state fetched at start of handler
+
+          if (!activeQuiz) {
+              world.chatManager.sendPlayerMessage(player, 'You are not currently in a quiz.', 'FFA500');
+              return;
+          }
+
+          const choiceStr = message.substring('/a '.length).trim();
+          const choiceNum = parseInt(choiceStr, 10);
+
+          const quiz = quizzes.find(q => q.id === activeQuiz.quizId);
+          if (!quiz) {
+              console.error(`[Chat /a] Active quiz data not found for ID: ${activeQuiz.quizId}`);
+              world.chatManager.sendPlayerMessage(player, `[System]: Error finding your current quiz data. Ending quiz.`, 'FF0000');
+              endQuiz(world, player, activeQuiz.quizId, false);
+              return;
+          }
+
+          const questionIndex = activeQuiz.questionIndex;
+          const currentQuestion = quiz.questions[questionIndex];
+          if (!currentQuestion) {
+               console.error(`[Chat /a] Active question data not found for quiz ${activeQuiz.quizId} at index ${questionIndex}`);
+               world.chatManager.sendPlayerMessage(player, `[System]: Error finding your current question data. Ending quiz.`, 'FF0000');
+               endQuiz(world, player, activeQuiz.quizId, false);
+               return;
+          }
+
+          if (isNaN(choiceNum) || choiceNum < 1 || choiceNum > currentQuestion.a.length) {
+              world.chatManager.sendPlayerMessage(player, `Invalid choice "${choiceStr}". Please enter a number between 1 and ${currentQuestion.a.length}.`, 'FF0000');
+              return;
+          }
+
+          const selectedAnswer = currentQuestion.a[choiceNum - 1];
+
+          // Clear the timer for this question
+          if (activeQuiz.timerId) {
+              clearTimeout(activeQuiz.timerId);
+              activeQuiz.timerId = null; // Important to clear it in state too
+          }
+
+          if (selectedAnswer === currentQuestion.correct) {
+              activeQuiz.score += 1;
+              world.chatManager.sendPlayerMessage(player, 'Correct!', '00FF00');
+              // Ask next question or end quiz if finished
+              askQuestion(world, player, activeQuiz.quizId, questionIndex + 1);
+          } else {
+              world.chatManager.sendPlayerMessage(player, `Incorrect! The correct answer was: ${currentQuestion.correct}`, 'FF0000');
+              endQuiz(world, player, activeQuiz.quizId, false); // End quiz due to incorrect answer
+          }
+          // No need to set playerState here, askQuestion/endQuiz handles it
+      }
+
+      // --- /sats Command ---
+      else if (message.trim() === '/sats') {
+          // Use playerState fetched at start of handler
+          world.chatManager.sendPlayerMessage(player, `Your current balance: ${playerState.sats} sats.`, 'FFFF00');
+      }
+
+      // Add other commands here if needed
+  });
+
+  console.log("Bitcoin Learning Game server initialized with NPCs, quiz logic, chat commands, and DB persistence.");
+
+}); // END startServer
+
+// --- NPC Interaction Logic ---
 function handleNpcInteraction(world: World, player: Player, npcEntityId: number | undefined) {
+    const username = player.username;
     if (npcEntityId === undefined) return;
 
     const npcInfo = npcs.get(npcEntityId);
@@ -421,33 +410,30 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
         return;
     }
 
-    const playerId = player.id;
-    if (playerId === undefined) {
-        console.error(`Player ${player.username} has undefined ID during interaction.`);
+    const playerState = playerStates.get(username);
+    if (!playerState) {
+        console.error(`Player state not found for player ${username} during interaction.`);
         return;
     }
-    const playerState = playerStates.get(playerId);
-    if (!playerState) {
-        console.error(`Player state not found for player ${player.username} (ID: ${playerId}) during interaction.`);
-        return; // Should not happen if JOINED_WORLD logic is correct
-    }
 
-    console.log(`Player ${player.username} collided with known NPC ID: ${npcEntityId}, type: ${npcInfo.type}`);
+    console.log(`Player ${username} collided with known NPC ID: ${npcEntityId}, type: ${npcInfo.type}`);
 
     if (npcInfo.type === 'knowledge') {
         const lesson = lessons.find(l => l.id === npcInfo.dataId);
         if (lesson) {
-            world.chatManager.sendPlayerMessage(player, `[${lesson.npcName}]: ${lesson.text}`, 'ADD8E6'); // Light Blue
+            world.chatManager.sendPlayerMessage(player, `[${lesson.npcName}]: ${lesson.text}`, 'ADD8E6');
 
             if (!playerState.completedLessons.has(lesson.id)) {
                 playerState.completedLessons.add(lesson.id);
-                if (updateSats(playerId, 1)) { // Award 1 sat
-                    world.chatManager.sendPlayerMessage(player, `+1 Sat! Lesson complete. Your balance: ${playerState.sats} sats.`, '00FF00'); // Green
+                const reward = lesson?.reward ?? 1;
+                if (updateSats(username, reward)) {
+                    world.chatManager.sendPlayerMessage(player, `+1 Sat! Lesson complete. Your balance: ${playerState.sats} sats.`, '00FF00');
                 } else {
-                    world.chatManager.sendPlayerMessage(player, `Lesson complete, but failed to update sats.`, 'FF0000'); // Red
+                    world.chatManager.sendPlayerMessage(player, `Lesson complete, but failed to update sats.`, 'FF0000');
                 }
+                playerStates.set(username, playerState); // Update state map after modification
             } else {
-                world.chatManager.sendPlayerMessage(player, `You have already learned this lesson.`, 'FFFF00'); // Yellow
+                world.chatManager.sendPlayerMessage(player, `You have already learned this lesson.`, 'FFFF00');
             }
         } else {
             console.error(`Knowledge NPC (ID: ${npcEntityId}) has invalid dataId: ${npcInfo.dataId}`);
@@ -456,15 +442,13 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
     } else if (npcInfo.type === 'quiz') {
         const quiz = quizzes.find(q => q.id === npcInfo.dataId);
         if (quiz) {
-            // Check if already completed
             if (playerState.completedQuizzes.has(quiz.id)) {
-                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: You have already completed the ${quiz.topic} quiz!`, 'FFFF00'); // Yellow
+                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: You have already completed the ${quiz.topic} quiz!`, 'FFFF00');
             } else if (playerState.activeQuiz) {
-                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Finish your current quiz before starting another!`, 'FFA500'); // Orange
+                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Finish your current quiz before starting another!`, 'FFA500');
             } else {
-                // Inform the player about the quiz on collision using the shortest command format
-                const shortQuizId = quiz.id.replace('quiz', 'q'); // e.g., quiz1 -> q1
-                world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: This is the ${quiz.topic} quiz. Type /q ${shortQuizId} to begin (Cost: ${quiz.cost} sat).`, 'FFA500'); // Orange
+                const shortQuizId = quiz.id.replace('quiz', 'q');
+                world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: This is the ${quiz.topic} quiz. Type /q ${shortQuizId} to begin (Cost: ${quiz.cost} sat).`, 'FFA500');
             }
         } else {
             console.error(`Quiz NPC (ID: ${npcEntityId}) has invalid dataId: ${npcInfo.dataId}`);
@@ -472,142 +456,3 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
         }
     }
 }
-
-// --- Chat Command Handling ---
-  world.chatManager.on(ChatEvent.BROADCAST_MESSAGE, ({ player, message }) => { // Revert to using 'message'
-      if (!player || player.id === undefined) return; // Ignore non-player messages or players without ID
-      const playerId = player.id; // Get player ID once
-
-      // --- /q (start quiz) Command ---
-      if (message.startsWith('/q ')) {
-          let rawQuizArg = message.substring('/q '.length).trim();
-          let quizId = rawQuizArg; // Assume full ID by default
-
-          // Check if it matches the short format (e.g., q1, q23)
-          if (/^q\d+$/.test(rawQuizArg)) {
-              quizId = 'quiz' + rawQuizArg.substring(1); // Reconstruct full ID (q1 -> quiz1)
-          }
-
-          const quiz = quizzes.find(q => q.id === quizId);
-          const playerState = playerStates.get(playerId);
-
-          if (!playerState) {
-              world.chatManager.sendPlayerMessage(player, `[System]: Your state could not be found. Please rejoin.`, 'FF0000');
-              return;
-          }
-
-          if (!quiz) {
-              world.chatManager.sendPlayerMessage(player, `Quiz with ID "${quizId}" not found.`, 'FF0000');
-              return;
-          }
-
-          // Check if already in a quiz
-          if (playerState.activeQuiz) {
-              world.chatManager.sendPlayerMessage(player, `You are already in a quiz! Finish it first.`, 'FFA500');
-              return;
-          }
-
-          // Check if already completed this quiz
-          if (playerState.completedQuizzes.has(quizId)) {
-              world.chatManager.sendPlayerMessage(player, `You have already completed the "${quiz.topic}" quiz.`, 'FFFF00');
-              return;
-          }
-
-          // Check cost
-          if (playerState.sats < quiz.cost) {
-              world.chatManager.sendPlayerMessage(player, `You don't have enough sats to start the "${quiz.topic}" quiz. Cost: ${quiz.cost} sats. You have: ${playerState.sats} sats.`, 'FF0000');
-              return;
-          }
-
-          // Deduct cost and start quiz
-          if (updateSats(playerId, -quiz.cost)) {
-              world.chatManager.sendPlayerMessage(player, `Starting quiz "${quiz.topic}"... Cost: ${quiz.cost} sats deducted. Your balance: ${playerState.sats} sats.`, '00FF00');
-
-              // Set active quiz state
-              playerState.activeQuiz = {
-                  quizId: quizId,
-                  questionIndex: 0, // Start at the first question
-                  timerId: null,    // Timer will be set by askQuestion
-                  score: 0          // Start score at 0
-              };
-              playerStates.set(playerId, playerState); // Update the map
-
-              // Ask the first question
-              askQuestion(world, player, quizId, 0);
-
-          } else {
-              // This case should ideally not happen if the check above passed, but good practice
-              world.chatManager.sendPlayerMessage(player, `Failed to deduct sats for quiz "${quiz.topic}". Please try again.`, 'FF0000');
-          }
-
-      // --- /a (answer) Command ---
-      } else if (message.startsWith('/a ')) {
-          const playerState = playerStates.get(playerId);
-
-          // Check if player is in a quiz
-          if (!playerState || !playerState.activeQuiz) {
-              world.chatManager.sendPlayerMessage(player, `You are not currently in a quiz.`, 'FFA500');
-              return;
-          }
-
-          const activeQuiz = playerState.activeQuiz;
-          const quiz = quizzes.find(q => q.id === activeQuiz.quizId);
-
-          if (!quiz) {
-              console.error(`Active quiz state points to non-existent quiz ID: ${activeQuiz.quizId}`);
-              world.chatManager.sendPlayerMessage(player, `[System]: Error finding your current quiz data. Ending quiz.`, 'FF0000');
-              endQuiz(world, player, activeQuiz.quizId, false); // End quiz due to error
-              return;
-          }
-
-          const currentQuestion = quiz.questions[activeQuiz.questionIndex];
-          if (!currentQuestion) {
-               console.error(`Active quiz state points to invalid question index: ${activeQuiz.questionIndex} for quiz ${activeQuiz.quizId}`);
-               world.chatManager.sendPlayerMessage(player, `[System]: Error finding your current question data. Ending quiz.`, 'FF0000');
-               endQuiz(world, player, activeQuiz.quizId, false); // End quiz due to error
-               return;
-          }
-
-          const choiceStr = message.substring('/a '.length).trim();
-          const choiceNumber = parseInt(choiceStr, 10);
-
-          // Validate choice number
-          if (isNaN(choiceNumber) || choiceNumber < 1 || choiceNumber > currentQuestion.a.length) {
-              world.chatManager.sendPlayerMessage(player, `Invalid choice "${choiceStr}". Please enter a number between 1 and ${currentQuestion.a.length}.`, 'FF0000');
-              return; // Let the player try again within the time limit
-          }
-
-          // Clear the timer since an answer was submitted
-          if (activeQuiz.timerId) {
-              clearTimeout(activeQuiz.timerId);
-              activeQuiz.timerId = null; // Important: clear the stored ID
-          }
-
-          const chosenAnswer = currentQuestion.a[choiceNumber - 1];
-
-          // Check if correct
-          if (chosenAnswer === currentQuestion.correct) {
-              world.chatManager.sendPlayerMessage(player, `Correct!`, '00FF00');
-              activeQuiz.score++; // Increment score
-              // Ask next question (or end if it was the last one)
-              askQuestion(world, player, activeQuiz.quizId, activeQuiz.questionIndex + 1);
-          } else {
-              world.chatManager.sendPlayerMessage(player, `Incorrect! The correct answer was: ${currentQuestion.correct}`, 'FF0000');
-              endQuiz(world, player, activeQuiz.quizId, false); // End quiz due to incorrect answer
-          }
-          // No need to playerStates.set here, askQuestion/endQuiz handles state updates
-      }
-      // Add other command handlers here if needed
-  });
-
-
-  // --- Ambient Audio (Optional) --- - REMOVED DUPLICATE
-  // Keep or modify as needed for the new game's atmosphere
-  // new Audio({
-  //   uri: 'audio/music/hytopia-main.mp3', // Consider changing this later
-  //   loop: true,
-  //   volume: 0.1,
-  // }).play(world);
-
-  console.log("Bitcoin Learning Game server initialized with NPCs, quiz logic, and chat commands.");
-}); // END startServer
