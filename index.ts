@@ -15,35 +15,17 @@ import {
   ChatEvent, // Import ChatEvent
 } from 'hytopia';
 
-// Use the specified boilerplate map
-import worldMap from './assets/maps/boilerplate.json';
+import worldMap from './assets/maps/boilerplate.json'; // Use the specified boilerplate map
+import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database'; // Import DB functions
+import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState } from './src/types'; // Import types
 
-// --- Lesson & Quiz Data ---
-interface Lesson {
-  id: string;
-  npcName: string; // For potential future use (e.g., NPC dialogue referencing)
-  text: string;
-}
-
-// Updated Quiz interface to include questions
-interface QuizQuestion {
-    q: string;
-    a: string[]; // Array of possible answers
-    correct: string; // The correct answer text
-}
-
-interface Quiz { // Renamed from QuizMeta and expanded
-  id: string;
-  npcName: string;
-  topic: string;
-  cost: number;
-  questions: QuizQuestion[];
-}
+// --- Lesson & Quiz Data (Using types from types.ts) ---
+// Definitions moved to src/types.ts
 
 const lessons: Lesson[] = [
-  { id: 'lesson1', npcName: 'InfoSkeleton', text: 'Bitcoin is a decentralized digital currency, meaning no single entity controls it.' },
-  { id: 'lesson2', npcName: 'DataBones', text: 'Transactions are recorded on a public ledger called the blockchain.' },
-  { id: 'lesson3', npcName: 'InfoSkeleton', text: 'New bitcoins are created through a process called mining.' },
+  { id: 'lesson1', npcName: 'InfoSkeleton', text: 'Bitcoin is a decentralized digital currency, meaning no single entity controls it.', reward: 1 },
+  { id: 'lesson2', npcName: 'DataBones', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
+  { id: 'lesson3', npcName: 'InfoSkeleton', text: 'New bitcoins are created through a process called mining.', reward: 1 },
 ];
 
 // Updated quizzes array with questions
@@ -53,6 +35,7 @@ const quizzes: Quiz[] = [
     npcName: 'QuizMind',
     topic: 'Bitcoin Basics',
     cost: 1,
+    reward: 10, // Add reward
     questions: [
       { q: 'What is Bitcoin primarily known as?', a: ['A physical coin', 'A decentralized digital currency', 'A government-backed asset'], correct: 'A decentralized digital currency' },
       { q: 'What is the maximum supply of Bitcoin?', a: ['100 Million', 'Unlimited', '21 Million'], correct: '21 Million' },
@@ -64,6 +47,7 @@ const quizzes: Quiz[] = [
     npcName: 'QuizMind',
     topic: 'Blockchain Fundamentals',
     cost: 2,
+    reward: 10, // Add reward
     questions: [
         { q: 'What is a block in a blockchain?', a: ['A type of cryptocurrency', 'A collection of transactions', 'A mining computer'], correct: 'A collection of transactions' },
         { q: 'How are blocks linked together?', a: ['With physical chains', 'Through cryptographic hashes', 'By email'], correct: 'Through cryptographic hashes' },
@@ -72,23 +56,10 @@ const quizzes: Quiz[] = [
 ];
 
 // --- State Management ---
-// Define the structure for active quiz state
-interface ActiveQuizState {
-    quizId: string;
-    questionIndex: number;
-    timerId: NodeJS.Timeout | null; // Store the timer ID
-    score: number; // Track correct answers
-}
-
-// Updated PlayerState interface
-interface PlayerState {
-    sats: number;
-    completedLessons: Set<string>;
-    activeQuiz: ActiveQuizState | null; // Track the current quiz state
-    completedQuizzes: Set<string>; // Track completed quizzes
-}
+// --- State Management (Using types from types.ts) ---
+// Definitions for ActiveQuizState and PlayerState (now InMemoryPlayerState) moved to src/types.ts
 // Map to track player state (using player.id as the key)
-const playerStates = new Map<string, PlayerState>();
+const playerStates = new Map<string, InMemoryPlayerState>();
 
 // --- NPC Management ---
 interface NpcInfo {
@@ -225,7 +196,15 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean) {
 // Removed external spawnNpc function. Spawning logic moved inline into JOINED_WORLD event.
 
 // --- Server Start ---
-startServer(world => {
+startServer(async world => { // Make the callback async
+  // Initialize Database first
+  try {
+    await initializeDatabase();
+  } catch (error) {
+    console.error("FATAL: Database initialization failed. Server cannot start.", error);
+    process.exit(1); // Stop the server if DB init fails
+  }
+
   // world.simulation.enableDebugRendering(true); // Keep commented out
 
   world.loadMap(worldMap);
@@ -341,7 +320,7 @@ startServer(world => {
   }
 
   // --- Player Join Logic ---
-  world.on(PlayerEvent.JOINED_WORLD, ({ player, world }) => { // Add world to destructuring
+  world.on(PlayerEvent.JOINED_WORLD, async ({ player, world }) => { // Make the handler async
     const playerEntity = new PlayerEntity({
       player,
       name: player.username, // Use player's username for the entity name
@@ -363,18 +342,16 @@ startServer(world => {
     }
 
     const playerId = playerEntity.player.id;
-    // Initialize player state with new fields
-    playerStates.set(playerId, {
-        sats: 5,
-        completedLessons: new Set<string>(),
-        activeQuiz: null, // Start with no active quiz
-        completedQuizzes: new Set<string>() // Start with no completed quizzes
-    });
-    console.log(`Player ${player.username} (ID: ${playerId}) joined. Initialized state.`);
+
+    // Load player data from DB
+    console.log(`Loading data for player ${player.username} (ID: ${playerId})...`);
+    const loadedState = await loadPlayerData(playerId);
+    playerStates.set(playerId, loadedState);
+    console.log(`Player ${player.username} (ID: ${playerId}) joined. Initial state loaded/set:`, loadedState);
 
     // Send welcome messages
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00'); // Green
-    world.chatManager.sendPlayerMessage(player, `You start with 5 sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00'); // Yellow
+    world.chatManager.sendPlayerMessage(player, `Your current balance: ${loadedState.sats} sats. Interact with NPCs to learn and take quizzes!`, 'FFFF00'); // Yellow
     // Removed delayed NPC spawning logic
 
 // Optional: Load UI if needed later
@@ -383,7 +360,7 @@ startServer(world => {
 }); // END JOINED_WORLD
 
   // --- Player Leave Logic ---
-  world.on(PlayerEvent.LEFT_WORLD, ({ player }) => {
+  world.on(PlayerEvent.LEFT_WORLD, async ({ player }) => { // Make the handler async
     // Clear any active quiz timer if the player leaves mid-quiz
     const playerId = player.id;
     if (playerId !== undefined) {
@@ -404,15 +381,25 @@ startServer(world => {
         }
     });
 
-    // Remove player's sat state when they leave
-    if (player.id !== undefined) {
-        if (playerStates.delete(player.id)) {
-            console.log(`Removed state for player ${player.username} (ID: ${player.id}).`);
+    // Save player state before removing from memory
+    if (playerId !== undefined) {
+        const finalState = playerStates.get(playerId);
+        if (finalState) {
+            console.log(`Saving final state for player ${player.username} (ID: ${playerId})...`);
+            await savePlayerData(playerId, finalState);
         } else {
-             console.warn(`Could not find state for leaving player ${player.username} (ID: ${player.id}).`);
+            console.warn(`Could not find final state for leaving player ${player.username} (ID: ${playerId}) to save.`);
+        }
+
+        // Remove player state from memory AFTER attempting to save
+        if (playerStates.delete(playerId)) {
+            console.log(`Removed in-memory state for player ${player.username} (ID: ${playerId}).`);
+        } else {
+             // This warning might be redundant if the 'finalState' check above already warned
+             console.warn(`Attempted to remove state for player ${player.username} (ID: ${playerId}), but it was already gone.`);
         }
     } else {
-        console.error(`Leaving player ${player.username} has undefined ID. Cannot remove state.`);
+        console.error(`Leaving player ${player.username} has undefined ID. Cannot save or remove state.`);
     }
   }); // END LEFT_WORLD
 
