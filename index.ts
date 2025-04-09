@@ -8,7 +8,7 @@ import {
   Player,
   Entity, // Import Entity
   // Raycast is not directly imported, use world.raycast
-  Input, // Import Input for PlayerEvent.INPUT
+  // Input, // Removed unused import
   RigidBodyType, // Import RigidBodyType
   ColliderShape, // Import ColliderShape
 } from 'hytopia';
@@ -96,14 +96,29 @@ startServer(world => {
           // position removed from constructor
           // name: 'InfoSkeleton', // Keep commented for now
           rigidBodyOptions: {
-              type: RigidBodyType.STATIC,
+              type: RigidBodyType.FIXED, // Use FIXED instead of STATIC
               colliders: [
-                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 } // Use CYLINDER enum like example
+                  // Physical collider to prevent falling
+                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 },
+                  // Sensor collider for interaction
+                  {
+                      shape: ColliderShape.CYLINDER,
+                      radius: 1.5, // Larger radius for interaction zone
+                      halfHeight: 1.5,
+                      isSensor: true,
+                      tag: 'interaction-sensor',
+                      onCollision: (other: Entity | BlockType, started: boolean) => {
+                          // Trigger only when collision starts and the other entity is a PlayerEntity
+                          if (started && other instanceof PlayerEntity && other.player) {
+                              handleNpcInteraction(world, other.player, infoSkeleton.id);
+                          }
+                      }
+                  }
               ]
           }
       });
       // Pass position as second argument to spawn
-      infoSkeleton.spawn(world, { x: 5, y: 5, z: 5 });
+      infoSkeleton.spawn(world, { x: 5, y: 3, z: 5 }); // Lower spawn height
       if (infoSkeleton.id !== undefined) {
           npcs.set(infoSkeleton.id, { type: 'knowledge', dataId: 'lesson1' });
           console.log(`Spawned knowledge NPC: InfoSkeleton (ID: ${infoSkeleton.id})`);
@@ -118,11 +133,25 @@ startServer(world => {
           // position removed from constructor
           // name: 'DataBones', // Keep commented for now
           rigidBodyOptions: {
-              type: RigidBodyType.STATIC,
-              colliders: [ { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 } ] // Use CYLINDER enum like example
+              type: RigidBodyType.FIXED, // Use FIXED instead of STATIC
+              colliders: [
+                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 },
+                  {
+                      shape: ColliderShape.CYLINDER,
+                      radius: 1.5,
+                      halfHeight: 1.5,
+                      isSensor: true,
+                      tag: 'interaction-sensor',
+                      onCollision: (other: Entity | BlockType, started: boolean) => {
+                          if (started && other instanceof PlayerEntity && other.player) {
+                              handleNpcInteraction(world, other.player, dataBones.id);
+                          }
+                      }
+                  }
+              ]
           }
       });
-      dataBones.spawn(world, { x: -5, y: 5, z: 5 });
+      dataBones.spawn(world, { x: -5, y: 3, z: 5 }); // Lower spawn height
       if (dataBones.id !== undefined) {
           npcs.set(dataBones.id, { type: 'knowledge', dataId: 'lesson2' });
           console.log(`Spawned knowledge NPC: DataBones (ID: ${dataBones.id})`);
@@ -137,11 +166,25 @@ startServer(world => {
           // position removed from constructor
           // name: 'QuizMind', // Keep commented for now
           rigidBodyOptions: {
-              type: RigidBodyType.STATIC,
-              colliders: [ { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 } ] // Use CYLINDER enum like example
+              type: RigidBodyType.FIXED, // Use FIXED instead of STATIC
+              colliders: [
+                  { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 },
+                  {
+                      shape: ColliderShape.CYLINDER,
+                      radius: 1.5,
+                      halfHeight: 1.5,
+                      isSensor: true,
+                      tag: 'interaction-sensor',
+                      onCollision: (other: Entity | BlockType, started: boolean) => {
+                          if (started && other instanceof PlayerEntity && other.player) {
+                              handleNpcInteraction(world, other.player, quizMind.id);
+                          }
+                      }
+                  }
+              ]
           }
       });
-      quizMind.spawn(world, { x: 0, y: 5, z: -5 });
+      quizMind.spawn(world, { x: 0, y: 3, z: -5 }); // Lower spawn height
       if (quizMind.id !== undefined) {
           npcs.set(quizMind.id, { type: 'quiz', dataId: 'quiz1' });
           console.log(`Spawned quiz NPC: QuizMind (ID: ${quizMind.id})`);
@@ -222,74 +265,60 @@ startServer(world => {
     volume: 0.1,
   }).play(world);
 
-  // --- Player Interaction Logic ---
-  world.on(PlayerEvent.INPUT, ({ player, input, world }) => { // Add world for logging if needed
-      // Check if the primary action input ('ml' based on hud.html) is pressed
-      if (input.ml) {
-          console.log(`Input 'ml' detected for player ${player.username}`); // LOG: Input detected
-          const playerEntity = world.entityManager.getPlayerEntityByPlayer(player);
-          if (!playerEntity || !playerEntity.player?.id) return; // Player entity or ID not found
+// --- NPC Interaction Logic (Called by Sensor Colliders) ---
+function handleNpcInteraction(world: World, player: Player, npcEntityId: number | undefined) {
+    if (npcEntityId === undefined) return;
 
-          const playerId = playerEntity.player.id;
-          const playerState = playerStates.get(playerId);
-          if (!playerState) return; // Player state not found
+    const npcInfo = npcs.get(npcEntityId);
+    if (!npcInfo) {
+        console.warn(`Collision with unknown NPC entity ID: ${npcEntityId}`);
+        return;
+    }
 
-          // Perform raycast from player camera using world.raycast
-          const rayOrigin = player.camera.position;
-          const rayDirection = player.camera.facingDirection;
-          const maxDist = 5;
-          console.log(`Raycast params: origin=${JSON.stringify(rayOrigin)}, direction=${JSON.stringify(rayDirection)}, maxDist=${maxDist}`); // LOG: Raycast params
-          const hit = world.raycast({
-              origin: rayOrigin,
-              direction: rayDirection,
-              maxDistance: maxDist,
-          });
-          console.log(`Raycast hit result: ${JSON.stringify(hit)}`); // LOG: Raycast result
+    const playerId = player.id;
+    if (playerId === undefined) {
+        console.error(`Player ${player.username} has undefined ID during interaction.`);
+        return;
+    }
+    const playerState = playerStates.get(playerId);
+    if (!playerState) {
+        console.error(`Player state not found for player ${player.username} (ID: ${playerId}) during interaction.`);
+        return; // Should not happen if JOINED_WORLD logic is correct
+    }
 
+    console.log(`Player ${player.username} collided with known NPC ID: ${npcEntityId}, type: ${npcInfo.type}`);
 
-          if (hit && hit.entityId !== undefined) {
-              const npcInfo = npcs.get(hit.entityId);
-              console.log(`Checking npcs map for ID ${hit.entityId}. Found: ${JSON.stringify(npcInfo)}`); // LOG: NPC lookup
-              if (npcInfo) {
-                  // Interaction with a known NPC
-                  console.log(`Player ${player.username} interacted with known NPC ID: ${hit.entityId}, type: ${npcInfo.type}`); // LOG: Known NPC hit
+    if (npcInfo.type === 'knowledge') {
+        const lesson = lessons.find(l => l.id === npcInfo.dataId);
+        if (lesson) {
+            world.chatManager.sendPlayerMessage(player, `[${lesson.npcName}]: ${lesson.text}`, 'ADD8E6'); // Light Blue
 
-                  if (npcInfo.type === 'knowledge') {
-                      const lesson = lessons.find(l => l.id === npcInfo.dataId);
-                      if (lesson) {
-                          world.chatManager.sendPlayerMessage(player, `[${lesson.npcName}]: ${lesson.text}`, 'ADD8E6'); // Light Blue
+            if (!playerState.completedLessons.has(lesson.id)) {
+                playerState.completedLessons.add(lesson.id);
+                if (updateSats(playerId, 1)) { // Award 1 sat
+                    world.chatManager.sendPlayerMessage(player, `+1 Sat! Lesson complete. Your balance: ${playerState.sats} sats.`, '00FF00'); // Green
+                } else {
+                    world.chatManager.sendPlayerMessage(player, `Lesson complete, but failed to update sats.`, 'FF0000'); // Red
+                }
+            } else {
+                world.chatManager.sendPlayerMessage(player, `You have already learned this lesson.`, 'FFFF00'); // Yellow
+            }
+        } else {
+            console.error(`Knowledge NPC (ID: ${npcEntityId}) has invalid dataId: ${npcInfo.dataId}`);
+            world.chatManager.sendPlayerMessage(player, `[System]: Error retrieving lesson data.`, 'FF0000');
+        }
+    } else if (npcInfo.type === 'quiz') {
+        const quiz = quizzes.find(q => q.id === npcInfo.dataId);
+        if (quiz) {
+            world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: This is the ${quiz.topic} quiz. Type /startquiz ${quiz.id} to begin (Cost: ${quiz.cost} sat).`, 'FFA500'); // Orange
+        } else {
+            console.error(`Quiz NPC (ID: ${npcEntityId}) has invalid dataId: ${npcInfo.dataId}`);
+            world.chatManager.sendPlayerMessage(player, `[System]: Error retrieving quiz data.`, 'FF0000');
+        }
+    }
+}
 
-                          if (!playerState.completedLessons.has(lesson.id)) {
-                              playerState.completedLessons.add(lesson.id);
-                              if (updateSats(playerId, 1)) { // Award 1 sat
-                                  world.chatManager.sendPlayerMessage(player, `+1 Sat! Lesson complete. Your balance: ${playerState.sats} sats.`, '00FF00'); // Green
-                              } else {
-                                  // This case shouldn't happen when adding sats, but good practice
-                                  world.chatManager.sendPlayerMessage(player, `Lesson complete, but failed to update sats.`, 'FF0000'); // Red
-                              }
-                          } else {
-                              world.chatManager.sendPlayerMessage(player, `You have already learned this lesson.`, 'FFFF00'); // Yellow
-                          }
-                      } else {
-                          console.error(`Knowledge NPC (ID: ${hit.entityId}) has invalid dataId: ${npcInfo.dataId}`);
-                          world.chatManager.sendPlayerMessage(player, `[System]: Error retrieving lesson data.`, 'FF0000');
-                      }
-                  } else if (npcInfo.type === 'quiz') {
-                      const quiz = quizzes.find(q => q.id === npcInfo.dataId);
-                      if (quiz) {
-                          world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: This is the ${quiz.topic} quiz. Type /startquiz ${quiz.id} to begin (Cost: ${quiz.cost} sat).`, 'FFA500'); // Orange
-                      } else {
-                          console.error(`Quiz NPC (ID: ${hit.entityId}) has invalid dataId: ${npcInfo.dataId}`);
-                          world.chatManager.sendPlayerMessage(player, `[System]: Error retrieving quiz data.`, 'FF0000');
-                      }
-                  }
-              }
-          }
-      }
-  }); // END PlayerEvent.INPUT
-
-
-  // --- Ambient Audio (Optional) ---
+// --- Ambient Audio (Optional) ---
   // Keep or modify as needed for the new game's atmosphere
   new Audio({
     uri: 'audio/music/hytopia-main.mp3', // Consider changing this later
