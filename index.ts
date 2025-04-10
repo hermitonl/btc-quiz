@@ -205,9 +205,9 @@ startServer(async world => {
           }
       };
 
-      spawnNpc({ model: 'models/players/robocop.gltf', scale: 1, pos: { x: 5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' }); 
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' }); // higher Y will float
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.5, pos: { x: 0, y: 2.1, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // lower Y will be burried
+      spawnNpc({ model: 'models/players/robocop.gltf', scale: 1.5, pos: { x: 5, y: 1.7, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' }); 
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.7, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' }); // higher Y will float
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1.9, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // lower Y will be burried
 
   } catch (error) {
       console.error("Error during initial NPC spawning:", error);
@@ -223,7 +223,7 @@ startServer(async world => {
       // Reverted rigidBodyOptions changes
     });
     // Spawn height adjusted for collider offset and height (halfHeight - offsetY)
-    playerEntity.spawn(world, { x: 0, y: 0.67, z: 0 }); // Set spawn Y back to 0.67
+    playerEntity.spawn(world, { x: 0, y: 0.67, z: 1 }); // Set spawn Y back to 0.67
 
     // Use username as the key
     const username = player.username;
