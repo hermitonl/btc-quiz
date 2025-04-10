@@ -207,7 +207,7 @@ startServer(async world => {
 
       spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.5, pos: { x: 5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' }); 
       spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.5, pos: { x: -5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' }); // higher Y will float
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.5, pos: { x: 0, y: 2, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // lower Y will be burried
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.5, pos: { x: 0, y: 2.1, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // lower Y will be burried
 
   } catch (error) {
       console.error("Error during initial NPC spawning:", error);
@@ -218,9 +218,11 @@ startServer(async world => {
     const playerEntity = new PlayerEntity({
       player,
       name: player.username,
-      modelUri: 'models/players/robot1.gltf',
+      modelUri: 'models/players/robot1.gltf', // Updated model name from file read
+      // Reverted rigidBodyOptions changes
     });
-    playerEntity.spawn(world, { x: 0, y: 0.67, z: 0 }); // lowest 0.67 maybe collission issue?
+    // Spawn height adjusted for collider offset and height (halfHeight - offsetY)
+    playerEntity.spawn(world, { x: 0, y: 0.67, z: 0 }); // Set spawn Y back to 0.67
 
     // Use username as the key
     const username = player.username;
