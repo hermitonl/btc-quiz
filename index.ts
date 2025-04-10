@@ -17,8 +17,8 @@ import {
 import worldMap from './assets/maps/bitcoin-quiz-map.json'; // Load the new Bitcoin quiz map
 import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database'; // Removed registerPlayer
 import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, DbPlayerState } from './src/types'; // Added DbPlayerState
+import { initializeNpcs } from './bitcoin-quiz/npcs'; // Import the NPC initializer
 // Removed bcrypt import
-
 /* --- Bitcoin Game Logic (Commented Out for Map Setup Task) ---
 // --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
@@ -216,17 +216,24 @@ startServer(async world => {
   }
   */
 
+  // Initialize Bitcoin Quiz NPCs
+  try {
+      initializeNpcs(world); // Call the function from npcs.ts
+  } catch (error) {
+       console.error("Error initializing Bitcoin Quiz NPCs:", error);
+  }
+
   // --- Player Join Logic ---
   world.on(PlayerEvent.JOINED_WORLD, async ({ player, world }) => {
     const playerEntity = new PlayerEntity({
       player,
       name: player.username,
       modelUri: 'models/players/robocop.gltf', // Updated model name from file read
-      modelScale: 0.2,
+      modelScale: 0.3,
       // Reverted rigidBodyOptions changes
     });
     // Spawn height adjusted for collider offset and height (halfHeight - offsetY)
-    playerEntity.spawn(world, { x: 10, y: 66, z: 10 }); // Spawn in center of City Plaza (floor y=64)
+    playerEntity.spawn(world, { x: 10, y: 65.7, z: 10 }); // Spawn 1 unit above City Plaza floor (floor y=64)
 
     // Use username as the key
     const username = player.username;
