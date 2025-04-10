@@ -26,10 +26,11 @@ const QUIZ_PLATFORM_CENTERS: Vector3[] = [
     new Vector3( 3, QUIZ_PLATFORM_Y, 5),   // Platform 2 (index 1) - Front Right
     new Vector3(-3, QUIZ_PLATFORM_Y, 10),  // Platform 3 (index 2) - Back Left
     new Vector3( 3, QUIZ_PLATFORM_Y, 10)   // Platform 4 (index 3) - Back Right
-    // IMPORTANT: Ensure these areas are clear and accessible in boilerplate.json map
 ];
 const PLATFORM_DETECTION_RADIUS_SQ = 1.5 * 1.5; // Squared radius for checking if player is 'on' a platform center (for answering)
 const PROXIMITY_DETECTION_RADIUS_SQ = 2.5 * 2.5; // Larger radius for proximity feedback
+const PLATFORM_BUILD_Y = 0; // Build platforms at Y=0 (adjust if ground level is different)
+const PLATFORM_SIZE = 3; // Build 3x3 platforms
 
 // --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
@@ -37,7 +38,6 @@ const lessons: Lesson[] = [
     { id: 'lesson2', npcName: 'DataBones', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
     { id: 'lesson3', npcName: 'InfoSkeleton', text: 'New bitcoins are created through mining.', reward: 1 },
 ];
-
 const quizzes: Quiz[] = [
     {
         id: 'quiz1', npcName: 'QuizMind', topic: 'Bitcoin Basics', cost: 1, reward: 10,
@@ -75,6 +75,30 @@ function updateSats(username: string, amount: number): boolean {
     return true;
 }
 
+// --- Platform Building Helper ---
+function buildPlatform(world: World, center: Vector3, blockTypeId: number) {
+    // Rely on try/catch inside the loop instead of checking method existence here
+    const halfSize = Math.floor(PLATFORM_SIZE / 2);
+    const minX = Math.floor(center.x - halfSize); const maxX = Math.floor(center.x + halfSize);
+    const minZ = Math.floor(center.z - halfSize); const maxZ = Math.floor(center.z + halfSize);
+    for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
+            try {
+                // Assume world.chunkLattice exists, catch if setBlock fails
+                world.chunkLattice.setBlock({ x, y: PLATFORM_BUILD_Y, z }, blockTypeId);
+            }
+            catch (e) {
+                console.error(`Error setting block at ${x},${PLATFORM_BUILD_Y},${z} (ID: ${blockTypeId}):`, e);
+                // Avoid spamming console if method is missing entirely
+                if (e instanceof TypeError && e.message.includes('setBlock')) {
+                    console.error("SDK Error: world.chunkLattice.setBlock might be missing or incorrect.");
+                    return; // Stop trying to build this platform if method is wrong
+                }
+            }
+        }
+    }
+}
+
 // --- Quiz Logic Functions ---
 function askQuestion(world: World, player: Player, quizId: string, questionIndex: number) {
     const username = player.username;
@@ -85,6 +109,15 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
         console.error(`askQuestion error: Player state or quiz not found for quizId ${quizId}`);
         return;
     }
+
+    // --- Rebuild platforms before asking ---
+    const platformBlockTypeIds = [18, 19, 20, 21]; // Must match IDs used in startServer
+    console.log(`[askQuestion] Rebuilding platforms for Q${questionIndex}`);
+    QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
+        const blockTypeId = platformBlockTypeIds[index % platformBlockTypeIds.length] || 1;
+        buildPlatform(world, center, blockTypeId); // Use helper function
+    });
+    // --- End Rebuild ---
 
     if (questionIndex >= quiz.questions.length) {
         endQuiz(world, player, quizId, true, 'correct'); // Won quiz
@@ -99,24 +132,16 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     }
 
     // Update active quiz state for the new question
-    // Ensure activeQuiz exists before assigning properties
     if (playerState.activeQuiz) {
         playerState.activeQuiz.questionIndex = questionIndex;
         playerState.activeQuiz.questionStartTime = Date.now();
-        playerState.activeQuiz.answeredCurrentQuestion = false; // Reset answer flag
-        playerState.activeQuiz.lastPlatformIndex = null; // Reset last platform index
-        // Score persists across questions within the same quiz attempt
+        playerState.activeQuiz.answeredCurrentQuestion = false;
+        playerState.activeQuiz.lastPlatformIndex = null;
     } else {
-        // This case should ideally not happen if askQuestion is called correctly
         console.error(`[askQuestion] activeQuiz was null for ${username} when trying to update.`);
-        // Initialize score if we somehow got here with a null activeQuiz
         playerState.activeQuiz = {
-            quizId: quizId,
-            questionIndex: questionIndex,
-            questionStartTime: Date.now(),
-            answeredCurrentQuestion: false,
-            lastPlatformIndex: null,
-            score: 0 // Initialize score here
+            quizId: quizId, questionIndex: questionIndex, questionStartTime: Date.now(),
+            answeredCurrentQuestion: false, lastPlatformIndex: null, score: 0
         };
     }
     playerState.lastProximityPlatformIndex = null; // Reset proximity tracker
@@ -139,7 +164,7 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     world.chatManager.sendPlayerMessage(player, `Stand on the correct platform! Time ends in ${QUIZ_DURATION_MS / 1000} seconds!`, 'FFFF00');
 
     // Timeout logic is handled in the setInterval loop
-} // Correct end of askQuestion
+}
 
 // Added 'reason' parameter for better feedback
 function endQuiz(world: World, player: Player, quizId: string, won: boolean, reason: 'correct' | 'incorrect' | 'timeout' | 'error' = 'error') {
@@ -171,9 +196,16 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
         playerStates.set(username, playerState); // Save completion status
     } else { // Player lost or quiz ended due to error/timeout
         let failMsg = `Quiz "${quiz?.topic || quizId}" Failed.`;
-        // Specific incorrect/timeout messages are now sent from the tick handler *before* calling endQuiz
+        // Specific incorrect/timeout messages are sent from the tick handler *before* calling endQuiz
         if (reason === 'error') {
              failMsg += ` Ended due to an issue.`;
+        } else if (reason === 'timeout') {
+             failMsg += ` Time ran out`;
+             if (lastPlatformIdx !== null) {
+                 failMsg += ` while on Platform ${lastPlatformIdx + 1}.`;
+             } else {
+                 failMsg += ` while not on any platform.`;
+             }
         }
         // Add cost info regardless of specific failure reason shown before
         failMsg += ` Cost: ${quiz?.cost || '?'} sats.`;
@@ -211,7 +243,7 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
         // If player is already in a quiz, don't re-prompt
         if (playerState.activeQuiz) {
              console.log(`Player ${username} interacted with quiz NPC while already in a quiz.`);
-             return; // Silently ignore or send a message
+             return; // Silently ignore
         }
         const quiz = quizzes.find(q => q.id === npcInfo.dataId);
         if (quiz) {
@@ -221,7 +253,7 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
                 playerState.pendingQuizId = quiz.id;
                 playerStates.set(username, playerState);
                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Ready for the "${quiz.topic}" quiz? Cost: ${quiz.cost} sats.`, 'FFFF00');
-                const shortQuizId = quiz.id.replace('quiz', 'q'); // e.g., quiz1 -> q1
+                const shortQuizId = quiz.id.replace('quiz', 'q');
                 world.chatManager.sendPlayerMessage(player, `Type /q ${shortQuizId} to begin.`, 'ADD8E6');
             }
         } else { console.error(`Quiz NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`); }
@@ -243,21 +275,12 @@ startServer(async world => {
   // --- Build Quiz Platforms Dynamically ---
   console.log("Building quiz platforms near spawn using chunkLattice...");
   const platformBlockTypeIds = [18, 19, 20, 21]; // Example: Red, Orange, Yellow, Lime Wool IDs? Adjust!
-  const platformBuildY = 0; // Build platforms at Y=0
-  if (world.chunkLattice?.setBlock) {
-      QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
-          const blockTypeId = platformBlockTypeIds[index % platformBlockTypeIds.length] || 1; // Cycle or default
-          const minX = Math.floor(center.x - 1); const maxX = Math.floor(center.x + 1);
-          const minZ = Math.floor(center.z - 1); const maxZ = Math.floor(center.z + 1);
-          for (let x = minX; x <= maxX; x++) {
-              for (let z = minZ; z <= maxZ; z++) {
-                  try { world.chunkLattice.setBlock({ x, y: platformBuildY, z }, blockTypeId); }
-                  catch (e) { console.error(`Error setting block at ${x},${platformBuildY},${z}:`, e); }
-              }
-          }
-          console.log(`Built platform ${index} with block ID ${blockTypeId} around ${center.x},${platformBuildY},${center.z}`);
-      });
-  } else { console.error("SDK Error: world.chunkLattice.setBlock not found. Cannot build platforms dynamically."); }
+  QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
+      const blockTypeId = platformBlockTypeIds[index % platformBlockTypeIds.length] || 1; // Cycle or default
+      buildPlatform(world, center, blockTypeId); // Use helper
+      console.log(`Built platform ${index} with block ID ${blockTypeId} around ${center.x},${PLATFORM_BUILD_Y},${center.z}`);
+  });
+  // Removed the 'else' block for the missing method check
 
   // --- Spawn NPCs ---
   try {
@@ -265,7 +288,7 @@ startServer(async world => {
           const npcEntity = new Entity({
               modelUri: config.model, modelScale: config.scale, modelLoopedAnimations: [ 'idle' ],
               rigidBodyOptions: { type: RigidBodyType.FIXED, colliders: [
-                      { shape: ColliderShape.CYLINDER, radius: 0.1, halfHeight: 0.1 }, // Physical
+                      { shape: ColliderShape.CYLINDER, radius: 0.1, halfHeight: 0.1 },
                       { shape: ColliderShape.CYLINDER, radius: 1.0, halfHeight: 1.0, isSensor: true, tag: 'interaction-sensor',
                           onCollision: (other: Entity | BlockType, started: boolean) => {
                               if (started && other instanceof PlayerEntity && other.player) {
@@ -283,9 +306,9 @@ startServer(async world => {
               console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) at ${spawnPos.x},${spawnPos.y},${spawnPos.z}`);
           } else { console.error(`Failed to get ID for spawned NPC: ${config.name}`); }
       };
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1.5, pos: { x: 5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
       spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // Near platform area
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
   // --- Player Join Logic ---
@@ -342,7 +365,7 @@ startServer(async world => {
                   // --- Get Player Position ---
                   const playerEntities = world.entityManager.getPlayerEntitiesByPlayer(player);
                   const playerEntity = playerEntities.length > 0 ? playerEntities[0] : undefined;
-                  if (!playerEntity?.position) continue; // Skip if no entity/position
+                  if (!playerEntity?.position) continue;
                   const position = playerEntity.position;
 
                   // --- Determine Current Platform ---
@@ -390,12 +413,32 @@ startServer(async world => {
                           console.log(`[TickCheck] Player ${username} timed out on question ${activeQuiz.questionIndex}`);
                           activeQuiz.answeredCurrentQuestion = true; // Mark answered
 
-                          const lastPlatformIdx = activeQuiz.lastPlatformIndex; // Use the index stored just before timeout
+                          // Define variables needed within this scope
+                          const lastPlatformIdx = activeQuiz.lastPlatformIndex;
                           const quiz = quizzes.find(q => q.id === activeQuiz.quizId);
                           const questionIndex = activeQuiz.questionIndex;
                           const currentQuestion = quiz?.questions[questionIndex];
                           const correctAnswerIndex = currentQuestion?.a.findIndex(answer => answer === currentQuestion.correct);
+                          let fellDown = false;
 
+                          // --- Remove Incorrect Platforms ---
+                          // Rely on try/catch inside buildPlatform helper
+                          console.log(`[Timeout] Removing incorrect platforms for Q${questionIndex}. Correct is ${correctAnswerIndex}`);
+                          for (let i = 0; i < QUIZ_PLATFORM_CENTERS.length; i++) {
+                              if (i !== correctAnswerIndex) { // Remove if NOT the correct platform
+                                  const center = QUIZ_PLATFORM_CENTERS[i];
+                                  if (center) {
+                                      buildPlatform(world, center, 0); // Use helper to set to air (ID 0)
+                                      // Check if player fell
+                                      if (lastPlatformIdx === i) {
+                                          fellDown = true;
+                                      }
+                                  }
+                              }
+                          }
+                          // --- End Remove Incorrect Platforms ---
+
+                          // --- Process Result ---
                           if (lastPlatformIdx !== null && correctAnswerIndex !== undefined && lastPlatformIdx === correctAnswerIndex) {
                               // Correct at timeout
                               world.chatManager.sendPlayerMessage(player, `Time's up, but you were on the correct platform!`, '00FF00');
@@ -404,15 +447,17 @@ startServer(async world => {
                           } else {
                               // Incorrect or no platform at timeout
                               let timeoutFeedback = "Time's up!";
-                              if (lastPlatformIdx !== null && currentQuestion && correctAnswerIndex !== undefined) {
-                                  timeoutFeedback += ` You were on Platform ${lastPlatformIdx + 1}. Correct was Platform ${correctAnswerIndex + 1}: ${currentQuestion.correct}`;
+                              if (fellDown) {
+                                  timeoutFeedback += ` Platform ${lastPlatformIdx! + 1} removed! You fell!`;
+                                  timeoutFeedback += ` You might need to rejoin or respawn.`;
                               } else if (lastPlatformIdx !== null) {
-                                  timeoutFeedback += ` You were on Platform ${lastPlatformIdx + 1}.`;
+                                  timeoutFeedback += ` You were on the wrong platform (${lastPlatformIdx + 1}).`;
                               } else {
                                   timeoutFeedback += ` You were not on any platform.`;
-                                  if (currentQuestion && correctAnswerIndex !== undefined) {
-                                     timeoutFeedback += ` Correct was Platform ${correctAnswerIndex + 1}: ${currentQuestion.correct}`;
-                                  }
+                              }
+                              // Always add correct answer info if available
+                              if (currentQuestion && correctAnswerIndex !== undefined) {
+                                  timeoutFeedback += ` Correct was Platform ${correctAnswerIndex + 1}: ${currentQuestion.correct}`;
                               }
                               world.chatManager.sendPlayerMessage(player, timeoutFeedback, 'FF0000');
                               endQuiz(world, player, activeQuiz.quizId, false, 'timeout');
@@ -441,7 +486,6 @@ startServer(async world => {
       // --- /q <shortId> Command (Replaces /confirmquiz) ---
       else if (message.startsWith('/q ')) {
            const shortQuizIdArg = message.substring('/q '.length).trim();
-           // Convert short ID (e.g., q1) back to full ID (e.g., quiz1)
            if (!shortQuizIdArg.startsWith('q') || shortQuizIdArg.length <= 1) {
                 world.chatManager.sendPlayerMessage(player, `Invalid quiz format. Use /q q1, /q q2 etc.`, 'FFA500');
                 return;
@@ -465,7 +509,6 @@ startServer(async world => {
            if (updateSats(username, -quiz.cost)) {
                world.chatManager.sendPlayerMessage(player, `Quiz "${quiz.topic}" confirmed! Cost: ${quiz.cost} sats. Balance: ${playerState.sats} sats.`, '00FF00');
                // Initialize activeQuiz state correctly
-               // askQuestion will set the specific question details
                playerState.activeQuiz = {
                    quizId: quizId, questionIndex: -1, questionStartTime: 0,
                    answeredCurrentQuestion: true, score: 0, lastPlatformIndex: null
