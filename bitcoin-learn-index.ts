@@ -20,8 +20,6 @@ import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, 
 // --- Constants ---
 const DEFAULT_SPAWN_POS = new Vector3(0, 0.67, 1); // Default player spawn location
 const QUIZ_DURATION_MS = 30 * 1000; // 30 seconds per question
-
-// --- Quiz Platform Configuration (In Main Map) ---
 const QUIZ_PLATFORM_Y = 0.1; // Y level slightly above ground for detection
 const QUIZ_PLATFORM_CENTERS: Vector3[] = [
     new Vector3(-3, QUIZ_PLATFORM_Y, 5),   // Platform 1 (index 0) - Front Left
@@ -83,14 +81,14 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     const playerState = playerStates.get(username);
     const quiz = quizzes.find(q => q.id === quizId);
 
-    if (!playerState || !quiz || !playerState.activeQuiz || playerState.activeQuiz.quizId !== quizId) {
-        console.error(`askQuestion invalid state for ${username}, quizId: ${quizId}`);
-        if (playerState) playerState.activeQuiz = null;
+    if (!playerState || !quiz) {
+        console.error(`askQuestion error: Player state or quiz not found for quizId ${quizId}`);
         return;
     }
 
     if (questionIndex >= quiz.questions.length) {
-        endQuiz(world, player, quizId, true, 'correct'); return; // Won quiz
+        endQuiz(world, player, quizId, true, 'correct'); // Won quiz
+        return;
     }
 
     const question = quiz.questions[questionIndex];
@@ -101,10 +99,26 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     }
 
     // Update active quiz state for the new question
-    playerState.activeQuiz.questionIndex = questionIndex;
-    playerState.activeQuiz.questionStartTime = Date.now();
-    playerState.activeQuiz.answeredCurrentQuestion = false; // Reset answer flag
-    playerState.activeQuiz.lastPlatformIndex = null; // Reset last platform index
+    // Ensure activeQuiz exists before assigning properties
+    if (playerState.activeQuiz) {
+        playerState.activeQuiz.questionIndex = questionIndex;
+        playerState.activeQuiz.questionStartTime = Date.now();
+        playerState.activeQuiz.answeredCurrentQuestion = false; // Reset answer flag
+        playerState.activeQuiz.lastPlatformIndex = null; // Reset last platform index
+        // Score persists across questions within the same quiz attempt
+    } else {
+        // This case should ideally not happen if askQuestion is called correctly
+        console.error(`[askQuestion] activeQuiz was null for ${username} when trying to update.`);
+        // Initialize score if we somehow got here with a null activeQuiz
+        playerState.activeQuiz = {
+            quizId: quizId,
+            questionIndex: questionIndex,
+            questionStartTime: Date.now(),
+            answeredCurrentQuestion: false,
+            lastPlatformIndex: null,
+            score: 0 // Initialize score here
+        };
+    }
     playerState.lastProximityPlatformIndex = null; // Reset proximity tracker
     playerStates.set(username, playerState); // Update state map
 
@@ -122,10 +136,10 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
         const hint = locationHints[index] || "";
         world.chatManager.sendPlayerMessage(player, `Platform ${index + 1} ${hint}: ${ans}`, 'ADD8E6');
     });
-    world.chatManager.sendPlayerMessage(player, `Stand on a platform! Time ends in ${QUIZ_DURATION_MS / 1000} seconds!`, 'FFFF00');
+    world.chatManager.sendPlayerMessage(player, `Stand on the correct platform! Time ends in ${QUIZ_DURATION_MS / 1000} seconds!`, 'FFFF00');
 
     // Timeout logic is handled in the setInterval loop
-}
+} // Correct end of askQuestion
 
 // Added 'reason' parameter for better feedback
 function endQuiz(world: World, player: Player, quizId: string, won: boolean, reason: 'correct' | 'incorrect' | 'timeout' | 'error' = 'error') {
@@ -207,7 +221,8 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
                 playerState.pendingQuizId = quiz.id;
                 playerStates.set(username, playerState);
                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Ready for the "${quiz.topic}" quiz? Cost: ${quiz.cost} sats.`, 'FFFF00');
-                world.chatManager.sendPlayerMessage(player, `Type /confirmquiz ${quiz.id} to begin.`, 'ADD8E6');
+                const shortQuizId = quiz.id.replace('quiz', 'q'); // e.g., quiz1 -> q1
+                world.chatManager.sendPlayerMessage(player, `Type /q ${shortQuizId} to begin.`, 'ADD8E6');
             }
         } else { console.error(`Quiz NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`); }
     }
@@ -250,7 +265,7 @@ startServer(async world => {
           const npcEntity = new Entity({
               modelUri: config.model, modelScale: config.scale, modelLoopedAnimations: [ 'idle' ],
               rigidBodyOptions: { type: RigidBodyType.FIXED, colliders: [
-                      { shape: ColliderShape.CYLINDER, radius: 0.1, halfHeight: 0.1 },
+                      { shape: ColliderShape.CYLINDER, radius: 0.1, halfHeight: 0.1 }, // Physical
                       { shape: ColliderShape.CYLINDER, radius: 1.0, halfHeight: 1.0, isSensor: true, tag: 'interaction-sensor',
                           onCollision: (other: Entity | BlockType, started: boolean) => {
                               if (started && other instanceof PlayerEntity && other.player) {
@@ -270,7 +285,7 @@ startServer(async world => {
       };
       spawnNpc({ model: 'models/players/robot1.gltf', scale: 1.5, pos: { x: 5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
       spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // Near platform area
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
   // --- Player Join Logic ---
@@ -419,10 +434,48 @@ startServer(async world => {
       const playerState = playerStates.get(username);
       if (!playerState) { console.warn(`Chat from ${username} but no state found.`); return; }
 
+      // --- /sats Command ---
       if (message.trim() === '/sats') {
           world.chatManager.sendPlayerMessage(player, `Balance: ${playerState.sats} sats.`, 'FFFF00');
       }
-      else if (message.startsWith('/login ')) {
+      // --- /q <shortId> Command (Replaces /confirmquiz) ---
+      else if (message.startsWith('/q ')) {
+           const shortQuizIdArg = message.substring('/q '.length).trim();
+           // Convert short ID (e.g., q1) back to full ID (e.g., quiz1)
+           if (!shortQuizIdArg.startsWith('q') || shortQuizIdArg.length <= 1) {
+                world.chatManager.sendPlayerMessage(player, `Invalid quiz format. Use /q q1, /q q2 etc.`, 'FFA500');
+                return;
+           }
+           const quizId = shortQuizIdArg.replace('q', 'quiz');
+
+           if (!playerState.pendingQuizId) { world.chatManager.sendPlayerMessage(player, 'Interact with a quiz NPC first.', 'FFA500'); return; }
+           if (playerState.pendingQuizId !== quizId) {
+               world.chatManager.sendPlayerMessage(player, `Command mismatch. Interact with NPC for '${playerState.pendingQuizId}' first.`, 'FF0000');
+               playerState.pendingQuizId = null; playerStates.set(username, playerState); return;
+           }
+
+           playerState.pendingQuizId = null; // Clear pending state
+           playerStates.set(username, playerState);
+
+           if (playerState.activeQuiz) { world.chatManager.sendPlayerMessage(player, 'Already in a quiz!', 'FFA500'); return; }
+           const quiz = quizzes.find(q => q.id === quizId);
+           if (!quiz) { console.error(`[ConfirmQuiz] Quiz data not found: ${quizId}`); world.chatManager.sendPlayerMessage(player, `[System]: Error finding quiz data for ${quizId}.`, 'FF0000'); return; }
+           if (playerState.sats < quiz.cost) { world.chatManager.sendPlayerMessage(player, `Insufficient sats. Cost: ${quiz.cost}, Have: ${playerState.sats}.`, 'FF0000'); return; }
+
+           if (updateSats(username, -quiz.cost)) {
+               world.chatManager.sendPlayerMessage(player, `Quiz "${quiz.topic}" confirmed! Cost: ${quiz.cost} sats. Balance: ${playerState.sats} sats.`, '00FF00');
+               // Initialize activeQuiz state correctly
+               // askQuestion will set the specific question details
+               playerState.activeQuiz = {
+                   quizId: quizId, questionIndex: -1, questionStartTime: 0,
+                   answeredCurrentQuestion: true, score: 0, lastPlatformIndex: null
+               };
+               playerStates.set(username, playerState);
+               askQuestion(world, player, quizId, 0); // Ask first question
+           } else { console.error(`[ConfirmQuiz] Failed to deduct sats for ${username}.`); world.chatManager.sendPlayerMessage(player, `[System]: Error processing transaction.`, 'FF0000'); }
+       }
+       // --- /login Command ---
+       else if (message.startsWith('/login ')) {
            const args = message.substring('/login '.length).trim().split(' ');
            if (args.length !== 1 || !args[0]) { world.chatManager.sendPlayerMessage(player, 'Usage: /login <username>', 'FFA500'); return; }
            const loginUsername = args[0];
@@ -445,29 +498,6 @@ startServer(async world => {
                    world.chatManager.sendPlayerMessage(player, `Balance: ${playerState.sats} sats.`, 'FFFF00');
                }
            }).catch(loadError => { console.error(`Login Error for ${loginUsername}:`, loadError); world.chatManager.sendPlayerMessage(player, 'Error during login.', 'FF0000'); });
-       }
-       else if (message.startsWith('/confirmquiz ')) {
-           const confirmQuizId = message.substring('/confirmquiz '.length).trim();
-           if (!playerState.pendingQuizId) { world.chatManager.sendPlayerMessage(player, 'Interact with a quiz NPC first.', 'FFA500'); return; }
-           if (playerState.pendingQuizId !== confirmQuizId) {
-               world.chatManager.sendPlayerMessage(player, `Confirmation mismatch. Expected '${playerState.pendingQuizId}'.`, 'FF0000');
-               playerState.pendingQuizId = null; playerStates.set(username, playerState); return;
-           }
-           const quizIdToStart = playerState.pendingQuizId;
-           playerState.pendingQuizId = null; playerStates.set(username, playerState);
-           if (playerState.activeQuiz) { world.chatManager.sendPlayerMessage(player, 'Already in a quiz!', 'FFA500'); return; }
-           const quiz = quizzes.find(q => q.id === quizIdToStart);
-           if (!quiz) { console.error(`[ConfirmQuiz] Quiz data not found: ${quizIdToStart}`); world.chatManager.sendPlayerMessage(player, `[System]: Error finding quiz data.`, 'FF0000'); return; }
-           if (playerState.sats < quiz.cost) { world.chatManager.sendPlayerMessage(player, `Insufficient sats. Cost: ${quiz.cost}, Have: ${playerState.sats}.`, 'FF0000'); return; }
-           if (updateSats(username, -quiz.cost)) {
-               world.chatManager.sendPlayerMessage(player, `Quiz "${quiz.topic}" confirmed! Cost: ${quiz.cost} sats. Balance: ${playerState.sats} sats.`, '00FF00');
-               playerState.activeQuiz = {
-                   quizId: quizIdToStart, questionIndex: -1, questionStartTime: 0,
-                   answeredCurrentQuestion: true, score: 0, lastPlatformIndex: null
-               };
-               playerStates.set(username, playerState);
-               askQuestion(world, player, quizIdToStart, 0);
-           } else { console.error(`[ConfirmQuiz] Failed to deduct sats for ${username}.`); world.chatManager.sendPlayerMessage(player, `[System]: Error processing transaction.`, 'FF0000'); }
        }
   }); // END ChatEvent.BROADCAST_MESSAGE
 
