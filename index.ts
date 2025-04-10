@@ -183,9 +183,9 @@ startServer(async world => {
               rigidBodyOptions: {
                   type: RigidBodyType.FIXED,
                   colliders: [
-                      { shape: ColliderShape.CYLINDER, radius: 0.5, halfHeight: 1 }, // Physical
+                      { shape: ColliderShape.CYLINDER, radius: 0.1, halfHeight: 0.1 }, // Physical
                       { // Interaction Sensor
-                          shape: ColliderShape.CYLINDER, radius: 1.5, halfHeight: 1.5, isSensor: true, tag: 'interaction-sensor',
+                          shape: ColliderShape.CYLINDER, radius: 0.1, halfHeight: 0.1, isSensor: true, tag: 'interaction-sensor',
                           onCollision: (other: Entity | BlockType, started: boolean) => {
                               if (started && other instanceof PlayerEntity && other.player) {
                                   handleNpcInteraction(world, other.player, npcEntity.id);
@@ -205,8 +205,8 @@ startServer(async world => {
           }
       };
 
-      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.5, pos: { x: 5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' }); 
-      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.5, pos: { x: -5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' }); // higher Y will float
+      spawnNpc({ model: 'models/players/robocop.gltf', scale: 1, pos: { x: 5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' }); 
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' }); // higher Y will float
       spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.5, pos: { x: 0, y: 2.1, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // lower Y will be burried
 
   } catch (error) {
@@ -218,7 +218,8 @@ startServer(async world => {
     const playerEntity = new PlayerEntity({
       player,
       name: player.username,
-      modelUri: 'models/players/robot1.gltf', // Updated model name from file read
+      modelUri: 'models/players/robot2.gltf', // Updated model name from file read
+      modelScale: 0.2,
       // Reverted rigidBodyOptions changes
     });
     // Spawn height adjusted for collider offset and height (halfHeight - offsetY)
