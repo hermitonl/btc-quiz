@@ -175,9 +175,11 @@ startServer(async world => {
 
   // --- Spawn NPCs ---
   try {
-      const spawnNpc = (config: { model: string, pos: {x: number, y: number, z: number}, type: 'knowledge' | 'quiz', dataId: string, name: string }) => {
+      const spawnNpc = (config: { model: string, scale: number, pos: {x: number, y: number, z: number}, type: 'knowledge' | 'quiz', dataId: string, name: string }) => {
           const npcEntity = new Entity({
               modelUri: config.model,
+              modelScale: config.scale,
+              modelLoopedAnimations: [ 'idle' ],
               rigidBodyOptions: {
                   type: RigidBodyType.FIXED,
                   colliders: [
@@ -203,9 +205,9 @@ startServer(async world => {
           }
       };
 
-      spawnNpc({ model: 'models/npcs/skeleton.gltf', pos: { x: 5, y: 3, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
-      spawnNpc({ model: 'models/npcs/skeleton.gltf', pos: { x: -5, y: 3, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', pos: { x: 0, y: 3, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
+      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.5, pos: { x: 5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' }); 
+      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.5, pos: { x: -5, y: 1.7, z: 5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' }); // higher Y will float
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.5, pos: { x: 0, y: 2, z: -5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' }); // lower Y will be burried
 
   } catch (error) {
       console.error("Error during initial NPC spawning:", error);
@@ -218,7 +220,7 @@ startServer(async world => {
       name: player.username,
       modelUri: 'models/players/robocop.gltf',
     });
-    playerEntity.spawn(world, new Vector3(0, 5, 0));
+    playerEntity.spawn(world, { x: 0, y: 0.67, z: 0 }); // lowest 0.67
 
     // Use username as the key
     const username = player.username;
