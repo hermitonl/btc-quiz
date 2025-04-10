@@ -1,4 +1,5 @@
 // src/types.ts
+import type { Player } from 'hytopia'; // Import Player type from 'hytopia'
 
 // Structure for data stored in/retrieved from the database
 export interface DbPlayerState {
@@ -11,8 +12,11 @@ export interface DbPlayerState {
 export interface ActiveQuizState {
     quizId: string;
     questionIndex: number;
-    timerId: NodeJS.Timeout | null; // Store the timer ID
+    // timerId: NodeJS.Timeout | null; // Removed timerId
+    questionStartTime: number; // Timestamp when the current question was asked
+    answeredCurrentQuestion: boolean; // Flag to prevent re-answering (now used to gate timeout processing)
     score: number; // Track correct answers
+    lastPlatformIndex: number | null; // Index of platform player was last on during the question time
 }
 
 // Structure for the player state held in memory during runtime
@@ -24,6 +28,9 @@ export interface InMemoryPlayerState {
     isGuest: boolean; // Flag to indicate if player data was loaded from DB
     isAuthenticated: boolean; // Flag to indicate if the player has successfully logged in
     loggedInUsername: string | null; // Stores the username the player is authenticated as, null if guest/not logged in
+    pendingQuizId: string | null; // ID of the quiz the player intends to start via /confirmquiz
+    playerObject?: Player; // Reference to the player object (transient, only valid while connected)
+    lastProximityPlatformIndex?: number | null; // Track last platform proximity message sent
 }
 
 // --- Shared Definitions ---
