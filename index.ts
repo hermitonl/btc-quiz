@@ -218,9 +218,9 @@ startServer(async world => {
     const playerEntity = new PlayerEntity({
       player,
       name: player.username,
-      modelUri: 'models/players/robocop.gltf',
+      modelUri: 'models/players/robot1.gltf',
     });
-    playerEntity.spawn(world, { x: 0, y: 0.67, z: 0 }); // lowest 0.67
+    playerEntity.spawn(world, { x: 0, y: 0.67, z: 0 }); // lowest 0.67 maybe collission issue?
 
     // Use username as the key
     const username = player.username;
