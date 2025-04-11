@@ -128,7 +128,7 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     }
 
     // --- Rebuild platforms before asking ---
-    const platformBlockTypeIds = [18, 19, 20, 21]; // Example IDs
+    const platformBlockTypeIds = [23, 24, 25, 26]; // Example IDs
     console.log(`[askQuestion] Rebuilding platforms for Q${questionIndex}`);
     let buildSuccess = true;
     QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
@@ -323,7 +323,7 @@ startServer(async world => {
 
   // --- Build Quiz Platforms Dynamically ---
   console.log("Building quiz platforms near spawn using chunkLattice...");
-  const platformBlockTypeIds = [18, 19, 20, 21]; // Example IDs
+  const platformBlockTypeIds = [23, 24, 25, 26]; // refer maps/boilerplate.json for IDs
   let canBuildPlatforms = true;
   QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
       if (canBuildPlatforms) {

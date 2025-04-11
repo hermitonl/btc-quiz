@@ -110,6 +110,26 @@
       "name": "water-still",
       "textureUri": "blocks/water-still.png",
       "isLiquid": true
+    },
+    {
+      "id": 23,
+      "name": "one",
+      "textureUri": "blocks/one.png"
+    },
+    {
+      "id": 24,
+      "name": "two",
+      "textureUri": "blocks/two.png"
+    },
+    {
+      "id": 25,
+      "name": "three",
+      "textureUri": "blocks/three.png"
+    },
+    {
+      "id": 26,
+      "name": "four",
+      "textureUri": "blocks/four.png"
     }
   ],
   "blocks": {
