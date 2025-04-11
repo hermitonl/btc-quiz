@@ -177,7 +177,8 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
             participant.player.ui.sendData({
                 remainingTime: initialSeconds,
                 questionText: question.q,
-                showQuiz: true // Explicitly show both UIs
+                answers: question.a, // Add answers array
+                showQuiz: true // Explicitly show quiz UI elements
             });
 
             // Send messages

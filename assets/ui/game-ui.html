@@ -37,7 +37,23 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         }
         #question-text {
-            margin: 0;
+            margin-bottom: 15px; /* Add space below question */
+        }
+        #answers-container {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column; /* Stack answers vertically */
+            align-items: flex-start; /* Align text to the left */
+            gap: 8px; /* Space between answers */
+            font-size: 18px; /* Slightly smaller font for answers */
+        }
+        .answer-option {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 5px 10px;
+            border-radius: 5px;
+            width: 100%; /* Make options take full width */
+            box-sizing: border-box; /* Include padding in width */
+            text-align: left;
         }
 
         /* --- Mobile Controls Styles --- */
@@ -88,6 +104,7 @@
     <!-- Quiz Question Element -->
     <div id="quiz-question-overlay">
         <p id="question-text">Question text will appear here.</p>
+        <div id="answers-container"></div> <!-- Container for answers -->
     </div>
 
     <!-- Mobile Controls Elements -->
@@ -105,6 +122,7 @@
         const countdownElement = document.getElementById('countdown-timer');
         const questionOverlay = document.getElementById('quiz-question-overlay');
         const questionTextElement = document.getElementById('question-text');
+        const answersContainer = document.getElementById('answers-container'); // Add reference
         const mobileInteractButton = document.getElementById('mobile-interact-button');
         const mobileJumpButton = document.getElementById('mobile-jump-button');
 
@@ -146,6 +164,10 @@
                         const displayStyle = data.showQuiz ? 'block' : 'none';
                         if (countdownElement) countdownElement.style.display = displayStyle;
                         if (questionOverlay) questionOverlay.style.display = displayStyle;
+                        // Clear answers when hiding
+                        if (!data.showQuiz && answersContainer) {
+                            answersContainer.innerHTML = '';
+                        }
                     }
 
                     // --- Countdown Time Update ---
@@ -157,6 +179,18 @@
                     if (typeof data.questionText === 'string' && questionTextElement) {
                         questionTextElement.innerText = data.questionText;
                     }
+                }
+
+                // --- Answers Update ---
+                if (Array.isArray(data.answers) && answersContainer) {
+                    answersContainer.innerHTML = ''; // Clear previous answers
+                    data.answers.forEach((answer, index) => {
+                        const answerDiv = document.createElement('div');
+                        answerDiv.classList.add('answer-option');
+                        // Display platform number (1-based) and answer text
+                        answerDiv.innerText = `[${index + 1}] ${answer}`;
+                        answersContainer.appendChild(answerDiv);
+                    });
                 }
             });
         } else {
