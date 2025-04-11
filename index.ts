@@ -304,7 +304,7 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
             // Removed completed check
             world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Ready for the "${quiz.topic}" quiz? Cost: ${quiz.cost} sats.`, 'FFFF00');
             const shortQuizId = quiz.id.replace('quiz', 'q');
-            world.chatManager.sendPlayerMessage(player, `Type /q ${shortQuizId} to start a round with players in the zone!`, 'ADD8E6');
+            world.chatManager.sendPlayerMessage(player, `Type /q to start a round with players in the zone!`, 'ADD8E6');
         } else { console.error(`Quiz NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`); }
     }
 }
@@ -589,74 +589,25 @@ startServer(async world => {
       if (message.trim() === '/sats') {
           world.chatManager.sendPlayerMessage(player, `Balance: ${playerState.sats} sats.`, 'FFFF00');
       }
-      else if (message.startsWith('/q ')) {
+      else if (message.trim() === '/q') { // Handle '/q' for random quiz
+          if (currentMultiplayerQuiz) { world.chatManager.sendPlayerMessage(player, `A quiz is already in progress!`, 'FFA500'); return; }
+          if (quizzes.length === 0) { world.chatManager.sendPlayerMessage(player, `No quizzes available to start.`, 'FFA500'); return; }
+
+          const randomIndex = Math.floor(Math.random() * quizzes.length);
+          const randomQuiz = quizzes[randomIndex];
+          initiateQuiz(world, randomQuiz, player); // Call the refactored function
+
+      } else if (message.startsWith('/q ')) { // Handle '/q <id>' for specific quiz
            const shortQuizIdArg = message.substring('/q '.length).trim();
            if (!shortQuizIdArg.startsWith('q') || shortQuizIdArg.length <= 1) {
-                world.chatManager.sendPlayerMessage(player, `Invalid quiz format. Use /q q1, /q q2 etc.`, 'FFA500'); return;
+                world.chatManager.sendPlayerMessage(player, `Invalid quiz format. Use /q q1, /q q2 etc., or just /q for random.`, 'FFA500'); return;
            }
            const quizId = shortQuizIdArg.replace('q', 'quiz');
-           if (currentMultiplayerQuiz) { world.chatManager.sendPlayerMessage(player, `A quiz is already in progress!`, 'FFA500'); return; }
            const quiz = quizzes.find(q => q.id === quizId);
            if (!quiz) { console.error(`[/q Command] Quiz data not found: ${quizId}`); world.chatManager.sendPlayerMessage(player, `[System]: Error finding quiz data for ${quizId}.`, 'FF0000'); return; }
 
-           const playersInZone: Player[] = [];
-           for (const pState of playerStates.values()) {
-                if (pState.playerObject) {
-                    const p = pState.playerObject;
-                    const pEntities = world.entityManager.getPlayerEntitiesByPlayer(p);
-                    const pEntity = pEntities.length > 0 ? pEntities[0] : undefined;
-                    if (pEntity?.position) {
-                        const pos = pEntity.position;
-                        if (pos.x >= QUIZ_ZONE_MIN.x && pos.x <= QUIZ_ZONE_MAX.x && pos.y >= QUIZ_ZONE_MIN.y && pos.y <= QUIZ_ZONE_MAX.y && pos.z >= QUIZ_ZONE_MIN.z && pos.z <= QUIZ_ZONE_MAX.z)
-                        { playersInZone.push(p); }
-                    }
-                }
-           }
-           if (playersInZone.length === 0) { world.chatManager.sendPlayerMessage(player, `No players found in the quiz zone to start the quiz.`, 'FFA500'); return; }
-
-           const participants = new Map<string, MultiplayerQuizParticipant>();
-           let participantsCount = 0;
-           for (const p of playersInZone) {
-                const pState = playerStates.get(p.username);
-                if (!pState) { console.warn(`Player ${p.username} in zone but has no state.`); continue; }
-                if (pState.activeQuiz) { world.chatManager.sendPlayerMessage(p, `You can't join, you're already in a quiz!`, 'FFA500'); continue; }
-                if (pState.sats < quiz.cost) { world.chatManager.sendPlayerMessage(p, `You don't have enough sats (${quiz.cost}) to join the quiz!`, 'FF0000'); continue; }
-                participantsCount++;
-                participants.set(p.username, { player: p, status: 'playing' });
-           }
-           if (participantsCount === 0) { world.chatManager.sendPlayerMessage(player, `No eligible players in the zone could join the quiz.`, 'FFA500'); return; }
-
-           let actualParticipantsCount = 0;
-           participants.forEach(participant => {
-                if (updateSats(participant.player.username, -quiz.cost)) {
-                    const pState = playerStates.get(participant.player.username);
-                    if (pState) {
-                        pState.activeQuiz = {
-                            quizId: quizId, questionIndex: -1, questionStartTime: 0,
-                            answeredCurrentQuestion: true, score: 0, lastPlatformIndex: null,
-                            lastTimerMessageSent: 0
-                        };
-                        playerStates.set(participant.player.username, pState);
-                    }
-                    world.chatManager.sendPlayerMessage(participant.player, `Joined quiz "${quiz.topic}"! ${quiz.cost} sats deducted.`, '00FF00');
-                    actualParticipantsCount++;
-                } else {
-                    console.error(`Failed to deduct sats for ${participant.player.username} after eligibility check!`);
-                    world.chatManager.sendPlayerMessage(participant.player, `Error joining quiz: Could not deduct cost.`, 'FF0000');
-                    participants.delete(participant.player.username);
-                }
-           });
-           if (actualParticipantsCount === 0) { console.log("Quiz start aborted, no participants after charging."); return; }
-
-           participants.forEach(p => { world.chatManager.sendPlayerMessage(p.player, `Starting "${quiz.topic}" quiz for ${actualParticipantsCount} players!`, '00FF00'); });
-
-           currentMultiplayerQuiz = {
-                quizId: quizId, questionIndex: -1, questionStartTime: 0,
-                participants: participants, questionEndTime: null
-           };
-           const firstParticipant = participants.values().next().value;
-           if (firstParticipant) { askQuestion(world, firstParticipant.player, quizId, 0); }
-           else { console.error("Failed to get first participant to start quiz."); currentMultiplayerQuiz = null; }
+           initiateQuiz(world, quiz, player); // Call the refactored function
+           // Removed stray brace/semicolon and leftover participant/askQuestion logic
        }
        else if (message.startsWith('/login ')) {
            const args = message.substring('/login '.length).trim().split(' ');
@@ -692,7 +643,80 @@ startServer(async world => {
     world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => {
       entity.applyImpulse({ x: 0, y: 100, z: 0 });
     });
-  });
+  }); // <<< Added missing closing bracket/parenthesis for /rocket command
+  
+  // --- Refactored Quiz Initiation Logic ---
+  function initiateQuiz(world: World, quiz: Quiz, initiatorPlayer: Player) {
+      if (currentMultiplayerQuiz) { world.chatManager.sendPlayerMessage(initiatorPlayer, `A quiz is already in progress!`, 'FFA500'); return; }
+  
+      const quizId = quiz.id;
+  
+      const playersInZone: Player[] = [];
+      for (const pState of playerStates.values()) {
+           if (pState.playerObject) {
+               const p = pState.playerObject;
+               const pEntities = world.entityManager.getPlayerEntitiesByPlayer(p);
+               const pEntity = pEntities.length > 0 ? pEntities[0] : undefined;
+               if (pEntity?.position) {
+                   const pos = pEntity.position;
+                   if (pos.x >= QUIZ_ZONE_MIN.x && pos.x <= QUIZ_ZONE_MAX.x && pos.y >= QUIZ_ZONE_MIN.y && pos.y <= QUIZ_ZONE_MAX.y && pos.z >= QUIZ_ZONE_MIN.z && pos.z <= QUIZ_ZONE_MAX.z)
+                   { playersInZone.push(p); }
+               }
+           }
+      }
+      if (playersInZone.length === 0) { world.chatManager.sendPlayerMessage(initiatorPlayer, `No players found in the quiz zone to start the quiz.`, 'FFA500'); return; }
+  
+      const participants = new Map<string, MultiplayerQuizParticipant>();
+      let participantsCount = 0;
+      for (const p of playersInZone) {
+           const pState = playerStates.get(p.username);
+           if (!pState) { console.warn(`Player ${p.username} in zone but has no state.`); continue; }
+           if (pState.activeQuiz) { world.chatManager.sendPlayerMessage(p, `You can't join, you're already in a quiz!`, 'FFA500'); continue; }
+           if (pState.sats < quiz.cost) { world.chatManager.sendPlayerMessage(p, `You don't have enough sats (${quiz.cost}) to join the quiz!`, 'FF0000'); continue; }
+           participantsCount++;
+           participants.set(p.username, { player: p, status: 'playing' });
+      }
+      if (participantsCount === 0) { world.chatManager.sendPlayerMessage(initiatorPlayer, `No eligible players in the zone could join the quiz.`, 'FFA500'); return; }
+  
+      let actualParticipantsCount = 0;
+      participants.forEach(participant => {
+           if (updateSats(participant.player.username, -quiz.cost)) {
+               const pState = playerStates.get(participant.player.username);
+               if (pState) {
+                   pState.activeQuiz = {
+                       quizId: quizId, questionIndex: -1, questionStartTime: 0,
+                       answeredCurrentQuestion: true, score: 0, lastPlatformIndex: null,
+                       lastTimerMessageSent: 0
+                   };
+                   playerStates.set(participant.player.username, pState);
+               }
+               world.chatManager.sendPlayerMessage(participant.player, `Joined quiz "${quiz.topic}"! ${quiz.cost} sats deducted.`, '00FF00');
+               actualParticipantsCount++;
+           } else {
+               console.error(`Failed to deduct sats for ${participant.player.username} after eligibility check!`);
+               world.chatManager.sendPlayerMessage(participant.player, `Error joining quiz: Could not deduct cost.`, 'FF0000');
+               participants.delete(participant.player.username);
+           }
+      });
+      if (actualParticipantsCount === 0) { console.log("Quiz start aborted, no participants after charging."); return; }
+  
+      participants.forEach(p => { world.chatManager.sendPlayerMessage(p.player, `Starting "${quiz.topic}" quiz for ${actualParticipantsCount} players!`, '00FF00'); });
+  
+      currentMultiplayerQuiz = {
+           quizId: quizId, questionIndex: -1, questionStartTime: 0,
+           participants: participants, questionEndTime: null
+      };
+
+      // --- Start the first question ---
+      const firstParticipant = participants.values().next().value;
+      if (firstParticipant) {
+          askQuestion(world, firstParticipant.player, quizId, 0);
+      } else {
+          console.error("[initiateQuiz] Failed to get first participant to start quiz after setting up state. Aborting.");
+          currentMultiplayerQuiz = null; // Clear the state if we can't start
+      }
+ }
+  // Removed stray closing bracket here
 
   // --- Ambient Audio ---
   new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 1.0 }).play(world);
