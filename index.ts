@@ -306,9 +306,9 @@ startServer(async world => {
               console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) at ${spawnPos.x},${spawnPos.y},${spawnPos.z}`);
           } else { console.error(`Failed to get ID for spawned NPC: ${config.name}`); }
       };
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1.9, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
   // --- Player Join Logic ---
@@ -545,7 +545,7 @@ startServer(async world => {
   }); // END ChatEvent.BROADCAST_MESSAGE
 
   // --- Ambient Audio ---
-  new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 0.1 }).play(world);
+  new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 1 }).play(world);
 
   console.log("Bitcoin Learning Game server initialized.");
 
