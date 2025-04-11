@@ -17,6 +17,7 @@ export interface ActiveQuizState {
     answeredCurrentQuestion: boolean; // Flag to prevent re-answering (now used to gate timeout processing)
     score: number; // Track correct answers
     lastPlatformIndex: number | null; // Index of platform player was last on during the question time
+    lastTimerMessageSent: number; // Timestamp when the last timer chat message was sent
 }
 
 // Structure for the player state held in memory during runtime
