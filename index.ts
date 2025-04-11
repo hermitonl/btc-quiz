@@ -674,7 +674,7 @@ startServer(async world => {
   }); // END ChatEvent.BROADCAST_MESSAGE
 
   // --- Ambient Audio ---
-  new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 0.1 }).play(world);
+  new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 1.0 }).play(world);
 
   console.log("Bitcoin Learning Game server initialized.");
 
