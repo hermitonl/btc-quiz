@@ -36,9 +36,9 @@ const QUIZ_ZONE_MAX = new Vector3( 6, 5, 13);  // Max coords for players to be i
 
 // --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
-    { id: 'lesson1', npcName: 'InfoSkeleton', text: 'Bitcoin is a decentralized digital currency...', reward: 1 },
-    { id: 'lesson2', npcName: 'DataBones', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
-    { id: 'lesson3', npcName: 'InfoSkeleton', text: 'New bitcoins are created through mining.', reward: 1 },
+    { id: 'lesson1', npcName: 'InfoBot', text: 'Bitcoin is a decentralized digital currency...', reward: 1 },
+    { id: 'lesson2', npcName: 'DataBot', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
+    { id: 'lesson3', npcName: 'BitBot', text: 'New bitcoins are created through mining.', reward: 1 },
 ];
 const quizzes: Quiz[] = [
     {
@@ -53,7 +53,8 @@ const quizzes: Quiz[] = [
         id: 'quiz2', npcName: 'QuizMind', topic: 'Blockchain Fundamentals', cost: 2, reward: 10,
         questions: [
             { q: 'What is a block in a blockchain?', a: ['A type of cryptocurrency', 'A collection of transactions', 'A mining computer', 'A famous bitcoiner'], correct: 'A collection of transactions' },
-            { q: 'How are blocks linked together?', a: ['With physical chains', 'Through cryptographic hashes', 'By email', 'SQL'], correct: 'Through cryptographic hashes' },
+            { q: 'How are blocks linked together?', a: ['Through cryptographic hashes', 'With physical chains', 'By email', 'SQL'], correct: 'Through cryptographic hashes' },
+            { q: 'Which of these is an essential property of good money?', a: ['Tastiness', 'Shininess', 'Popularity', 'Scarcity'], correct: 'Scarcity' }
         ]
     },
 ];
@@ -361,8 +362,9 @@ startServer(async world => {
               console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) at ${spawnPos.x},${spawnPos.y},${spawnPos.z}`);
           } else { console.error(`Failed to get ID for spawned NPC: ${config.name}`); }
       };
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoSkeleton' });
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBones' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBot' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -10, y: 1.65, z: 15 }, type: 'knowledge', dataId: 'lesson3', name: 'BitBot' });
       spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1.9, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
