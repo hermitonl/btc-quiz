@@ -429,9 +429,11 @@ startServer(async world => {
                           const remainingSeconds = Math.max(0, Math.ceil((QUIZ_DURATION_MS - timeElapsed) / 1000));
                           // Send only if time remaining > 0
                           if (remainingSeconds > 0) {
+                               console.log(`[Tick Timer Msg] Sending timer update for ${username}: ${remainingSeconds}s`); // Add log
                                world.chatManager.sendPlayerMessage(player, `[Quiz] Time Remaining: ${remainingSeconds}s`, 'FFA500');
                           }
                           activeQuiz.lastTimerMessageSent = now; // Update timestamp
+                          console.log(`[Tick Timer Msg] Updated lastTimerMessageSent for ${username} to ${now}`); // Add log
                       }
                   }
                   // --- End Timer Update Message ---
