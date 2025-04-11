@@ -44,16 +44,16 @@ const quizzes: Quiz[] = [
     {
         id: 'quiz1', npcName: 'QuizMind', topic: 'Bitcoin Basics', cost: 1, reward: 10,
         questions: [
-            { q: 'What is Bitcoin primarily known as?', a: ['A physical coin', 'A decentralized digital currency', 'A government-backed asset'], correct: 'A decentralized digital currency' },
-            { q: 'What is the maximum supply of Bitcoin?', a: ['100 Million', 'Unlimited', '21 Million'], correct: '21 Million' },
-            { q: 'What technology underlies Bitcoin transactions?', a: ['Database', 'Blockchain', 'Spreadsheet'], correct: 'Blockchain' }
+            { q: 'What is Bitcoin primarily known as?', a: ['A physical coin', 'A decentralized digital currency', 'A government-backed asset', 'A paper gold certificate'], correct: 'A decentralized digital currency' },
+            { q: 'What is the maximum supply of Bitcoin?', a: ['100 Million', 'Unlimited', '21 Million', '100'], correct: '21 Million' },
+            { q: 'What technology underlies Bitcoin transactions?', a: ['Database', 'Blockchain', 'Spreadsheet', 'Barter'], correct: 'Blockchain' }
         ]
     },
     {
         id: 'quiz2', npcName: 'QuizMind', topic: 'Blockchain Fundamentals', cost: 2, reward: 10,
         questions: [
-            { q: 'What is a block in a blockchain?', a: ['A type of cryptocurrency', 'A collection of transactions', 'A mining computer'], correct: 'A collection of transactions' },
-            { q: 'How are blocks linked together?', a: ['With physical chains', 'Through cryptographic hashes', 'By email'], correct: 'Through cryptographic hashes' },
+            { q: 'What is a block in a blockchain?', a: ['A type of cryptocurrency', 'A collection of transactions', 'A mining computer', 'A famous bitcoiner'], correct: 'A collection of transactions' },
+            { q: 'How are blocks linked together?', a: ['With physical chains', 'Through cryptographic hashes', 'By email', 'SQL'], correct: 'Through cryptographic hashes' },
         ]
     },
 ];
