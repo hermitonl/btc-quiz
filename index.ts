@@ -369,6 +369,9 @@ startServer(async world => {
         playerObject: player, lastProximityPlatformIndex: null,
     };
     playerStates.set(username, inMemoryState);
+
+    // Load Mobile Controls UI
+    player.ui.load('ui/mobile-controls-index.html');
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
     world.chatManager.sendPlayerMessage(player, `Guest mode. Use /login <username> to save progress.`, 'FFA500');
     world.chatManager.sendPlayerMessage(player, `Balance: ${inMemoryState.sats} sats.`, 'FFFF00');
