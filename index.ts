@@ -676,6 +676,16 @@ startServer(async world => {
        }
   }); // END ChatEvent.BROADCAST_MESSAGE
 
+  /**
+   * A silly little easter egg command. When a player types
+   * "/rocket" in the game, they'll get launched into the air!
+   */
+  world.chatManager.registerCommand('/rocket', player => {
+    world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => {
+      entity.applyImpulse({ x: 0, y: 100, z: 0 });
+    });
+  });
+
   // --- Ambient Audio ---
   new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 1.0 }).play(world);
 
