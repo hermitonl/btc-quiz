@@ -5,8 +5,9 @@
       "name": "/app",
       "dependencies": {
         "@hytopia.com/assets": "^0.2.8",
+        "@types/node": "^22.14.0",
         "bcrypt": "^5.1.1",
-        "hytopia": "^0.3.28",
+        "hytopia": "^0.3.32",
         "pg": "^8.14.1",
       },
       "devDependencies": {
@@ -306,7 +307,7 @@
 
     "https-proxy-agent": ["https-proxy-agent@5.0.1", "", { "dependencies": { "agent-base": "6", "debug": "4" } }, "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA=="],
 
-    "hytopia": ["hytopia@0.3.28", "", { "dependencies": { "@gltf-transform/cli": "4.1.1", "archiver": "^7.0.1" }, "bin": { "hytopia": "bin/scripts.js" } }, "sha512-xO7nBCk9fE/g2nDol3muxa86h1/oKe8KyaIjfy7OrAqjV/KGgUuk/w0QFdDnqFpb1ueXeHTz3J8lo7eokuoZeA=="],
+    "hytopia": ["hytopia@0.3.32", "", { "dependencies": { "@gltf-transform/cli": "4.1.1", "archiver": "^7.0.1" }, "bin": { "hytopia": "bin/scripts.js" } }, "sha512-KDKOjjqxErpKhcAIrFaLDK2qNUraWMfJGpufkWvC0Ag+ny+sZQ3SjVWnE6afb7sQrxwuQknCd7Q0SM71mRvrag=="],
 
     "ieee754": ["ieee754@1.2.1", "", {}, "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="],
 

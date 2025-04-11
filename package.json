@@ -13,8 +13,9 @@
   },
   "dependencies": {
     "@hytopia.com/assets": "^0.2.8",
+    "@types/node": "^22.14.0",
     "bcrypt": "^5.1.1",
-    "hytopia": "^0.3.28",
+    "hytopia": "^0.3.32",
     "pg": "^8.14.1"
   }
 }

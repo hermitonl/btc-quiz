@@ -22,5 +22,14 @@ ENV PATH="/root/.bun/bin:${PATH}"
 # Set the working directory inside the container
 WORKDIR /app
 
+# Copy package.json and bun.lockb to leverage cache
+COPY package.json bun.lock ./
+
+# Install project dependencies using Bun
+RUN bun install --frozen-lockfile
+
+# Copy the rest of the application code
+# COPY . . # Optional: Uncomment if you want the code baked into the image instead of using volume mount
+
 # Set the default command to bash for an interactive shell
 CMD ["bash"]
