@@ -99,6 +99,7 @@ function buildPlatform(world: World, center: Vector3, blockTypeId: number): bool
     for (let x = minX; x <= maxX; x++) {
         for (let z = minZ; z <= maxZ; z++) {
             try {
+                // Assume world.chunkLattice exists and setBlock works
                 world.chunkLattice.setBlock({ x, y: PLATFORM_BUILD_Y, z }, blockTypeId);
             }
             catch (e) {
@@ -115,17 +116,19 @@ function buildPlatform(world: World, center: Vector3, blockTypeId: number): bool
 }
 
 // --- Quiz Logic Functions ---
+// These functions rely on 'world' being available in their call scope (passed from handlers inside startServer)
 function askQuestion(world: World, player: Player, quizId: string, questionIndex: number) {
     const quiz = quizzes.find(q => q.id === quizId);
 
-    if (!currentMultiplayerQuiz || !quiz) {
-        console.error(`askQuestion error: Quiz not found (${quizId}) or no active multiplayer quiz.`);
+    // Check global state exists and matches
+    if (!currentMultiplayerQuiz || currentMultiplayerQuiz.quizId !== quizId || !quiz) {
+        console.error(`askQuestion error: Quiz not found (${quizId}) or no active/matching multiplayer quiz.`);
         currentMultiplayerQuiz = null;
         return;
     }
 
     // --- Rebuild platforms before asking ---
-    const platformBlockTypeIds = [18, 19, 20, 21];
+    const platformBlockTypeIds = [18, 19, 20, 21]; // Example IDs
     console.log(`[askQuestion] Rebuilding platforms for Q${questionIndex}`);
     let buildSuccess = true;
     QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
@@ -140,8 +143,8 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     // Check if questionIndex is valid BEFORE processing
     const question = quiz.questions[questionIndex];
     if (!question) {
-        // This means the quiz should have ended in the previous tick's timeout check
         console.warn(`[askQuestion] Called with invalid questionIndex ${questionIndex} for quiz ${quizId}. Quiz should have ended.`);
+        // Ensure global state is cleared if somehow missed
         if (currentMultiplayerQuiz?.quizId === quizId) { currentMultiplayerQuiz = null; }
         return;
     }
@@ -154,13 +157,15 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     // Update state and send messages for all active participants
     currentMultiplayerQuiz.participants.forEach(participant => {
         const pState = playerStates.get(participant.player.username);
+        // Ensure player is still meant to be in this quiz and update their state
         if (pState?.activeQuiz?.quizId === quizId) {
             pState.activeQuiz.questionIndex = questionIndex;
+            // Ensure currentMultiplayerQuiz is not null before accessing property
             if (currentMultiplayerQuiz) {
                  pState.activeQuiz.questionStartTime = currentMultiplayerQuiz.questionStartTime;
             } else {
                  console.error("[askQuestion] currentMultiplayerQuiz became null unexpectedly during participant loop.");
-                 return;
+                 return; // Skip this participant if global state vanished
             }
             pState.activeQuiz.answeredCurrentQuestion = false;
             pState.activeQuiz.lastPlatformIndex = null;
@@ -198,6 +203,7 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
     }
 } // End askQuestion
 
+// Must be called within startServer scope
 function endQuiz(world: World, player: Player, quizId: string, won: boolean, reason: 'correct' | 'incorrect' | 'timeout' | 'error' = 'error') {
     const username = player.username;
     const playerState = playerStates.get(username);
@@ -216,14 +222,14 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
         playerStates.set(username, playerState);
 
         if (won) {
-            playerState.completedQuizzes.add(quizId);
+            // playerState.completedQuizzes.add(quizId); // Removed to allow repeats
             const reward = quiz?.reward ?? 10;
             if (updateSats(username, reward)) {
                 world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Complete! +${reward} sats. Balance: ${playerState.sats} sats.`, '00FF00');
             } else {
                  world.chatManager.sendPlayerMessage(player, `Quiz "${quiz?.topic || quizId}" Complete! Failed to award sats.`, 'FF0000');
             }
-            playerStates.set(username, playerState); // Save completion status
+            // playerStates.set(username, playerState); // State already updated
         } else {
             let failMsg = `Quiz "${quiz?.topic || quizId}" Failed.`;
             if (reason === 'error') { failMsg += ` Ended due to an issue.`; }
@@ -244,7 +250,6 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
     }
 
     // Check if this player was the last one playing in the global quiz
-    // This check should happen *after* processing win/loss for the player
     if (currentMultiplayerQuiz?.quizId === quizId) {
         currentMultiplayerQuiz.participants.delete(username); // Remove player regardless of win/loss
         if (currentMultiplayerQuiz.participants.size === 0) {
@@ -254,6 +259,7 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
     }
 }
 
+// Must be called within startServer scope
 function handleNpcInteraction(world: World, player: Player, npcEntityId: number | undefined) {
     const username = player.username;
     if (npcEntityId === undefined) return;
@@ -285,13 +291,10 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
         }
         const quiz = quizzes.find(q => q.id === npcInfo.dataId);
         if (quiz) {
-            if (playerState.completedQuizzes.has(quiz.id)) {
-                 world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: You already completed the ${quiz.topic} quiz!`, 'FFFF00');
-            } else {
-                world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Ready for the "${quiz.topic}" quiz? Cost: ${quiz.cost} sats.`, 'FFFF00');
-                const shortQuizId = quiz.id.replace('quiz', 'q');
-                world.chatManager.sendPlayerMessage(player, `Type /q ${shortQuizId} to start a round with players in the zone!`, 'ADD8E6');
-            }
+            // Removed completed check
+            world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Ready for the "${quiz.topic}" quiz? Cost: ${quiz.cost} sats.`, 'FFFF00');
+            const shortQuizId = quiz.id.replace('quiz', 'q');
+            world.chatManager.sendPlayerMessage(player, `Type /q ${shortQuizId} to start a round with players in the zone!`, 'ADD8E6');
         } else { console.error(`Quiz NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`); }
     }
 }
@@ -315,7 +318,7 @@ startServer(async world => {
   QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
       if (canBuildPlatforms) {
           const blockTypeId = platformBlockTypeIds[index % platformBlockTypeIds.length] || 1;
-          if (!buildPlatform(world, center, blockTypeId)) {
+          if (!buildPlatform(world, center, blockTypeId)) { // Pass world
               canBuildPlatforms = false;
           } else {
               console.log(`Built platform ${index} with block ID ${blockTypeId} around ${center.x},${PLATFORM_BUILD_Y},${center.z}`);
@@ -334,7 +337,7 @@ startServer(async world => {
                       { shape: ColliderShape.CYLINDER, radius: 1.0, halfHeight: 1.0, isSensor: true, tag: 'interaction-sensor',
                           onCollision: (other: Entity | BlockType, started: boolean) => {
                               if (started && other instanceof PlayerEntity && other.player) {
-                                  handleNpcInteraction(world, other.player, npcEntity.id);
+                                  handleNpcInteraction(world, other.player, npcEntity.id); // Pass world
                               }
                           }
                       }
@@ -534,11 +537,6 @@ startServer(async world => {
                       participantsMap.forEach((p, uname) => {
                           if (p.status === 'correct') {
                               endQuiz(world, p.player, activeQuizId, true, 'correct'); // Call endQuiz with won=true
-                          } else {
-                              // Ensure any remaining 'playing' players who didn't time out are marked out
-                              if (p.status === 'playing') {
-                                  endQuiz(world, p.player, activeQuizId, false, 'error'); // Or another appropriate reason
-                              }
                           }
                       });
                       currentMultiplayerQuiz = null; // Clear global state
@@ -556,7 +554,7 @@ startServer(async world => {
                                  else { console.error("Error: No participants left to ask next question."); currentMultiplayerQuiz = null; }
                               }
                           }, 1000); // Delay for platform removal visual
-                      } else { console.log("Error: anyoneCorrect was true but no participants left after filtering."); currentMultiplayerQuiz = null; }
+                      } else { console.log("All players eliminated. Ending quiz."); currentMultiplayerQuiz = null; } // Changed from Error log
                   }
               } else {
                   // No one was correct, end the quiz for everyone who was playing
