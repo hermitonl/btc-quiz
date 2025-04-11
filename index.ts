@@ -19,7 +19,7 @@ import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, 
 
 // --- Constants ---
 const DEFAULT_SPAWN_POS = new Vector3(0, 0.67, 1); // Default player spawn location
-const QUIZ_DURATION_MS = 30 * 1000; // 30 seconds per question
+const QUIZ_DURATION_MS = 15 * 1000; // 15 seconds per question
 const QUIZ_PLATFORM_Y = 0.1; // Y level slightly above ground for detection
 const QUIZ_PLATFORM_CENTERS: Vector3[] = [
     new Vector3(-3, QUIZ_PLATFORM_Y, 5),   // Platform 1 (index 0) - Front Left
@@ -156,7 +156,7 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
          world.chatManager.sendPlayerMessage(player, `[System]: Error loading answers. Ending quiz.`, 'FF0000');
          endQuiz(world, player, quizId, false, 'error'); return;
     }
-    const locationHints = ["(Front-Left)", "(Front-Right)", "(Back-Left)", "(Back-Right)"];
+    const locationHints = ["(Front-Right)", "(Front-Left)", "(Back-Right)", "(Back-Left)"];
     question.a.forEach((ans, index) => {
         const hint = locationHints[index] || "";
         world.chatManager.sendPlayerMessage(player, `Platform ${index + 1} ${hint}: ${ans}`, 'ADD8E6');
