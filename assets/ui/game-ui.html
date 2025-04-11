@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HYTOPIA Game UI</title>
+    <style>
+        /* --- Countdown Timer Styles --- */
+        #countdown-timer {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            color: white;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; /* Black outline */
+            z-index: 1000;
+            display: none; /* Hidden by default */
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* --- Quiz Question Styles --- */
+        #quiz-question-overlay {
+            position: fixed;
+            top: 15%; /* Position below the countdown timer */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 600px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+            font-family: 'Inter', sans-serif;
+            z-index: 999; /* Below countdown timer */
+            display: none; /* Hidden by default */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        #question-text {
+            margin: 0;
+        }
+
+        /* --- Mobile Controls Styles --- */
+        .mobile-controls {
+            display: none; /* Hidden by default */
+        }
+        /* Show only on mobile */
+        body.mobile .mobile-controls {
+            display: flex;
+            gap: 14px;
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            z-index: 1001; /* Above countdown/question */
+        }
+        .mobile-button {
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            align-items: center;
+            justify-content: center;
+            display: flex;
+            width: 50px;
+            height: 50px;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform, background-color;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+        .mobile-button img {
+            width: 22px;
+            height: 22px;
+        }
+        .mobile-button.active {
+            transform: scale(0.92);
+            background-color: rgba(0, 0, 0, 0.75);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Countdown Timer Element -->
+    <div id="countdown-timer"></div>
+
+    <!-- Quiz Question Element -->
+    <div id="quiz-question-overlay">
+        <p id="question-text">Question text will appear here.</p>
+    </div>
+
+    <!-- Mobile Controls Elements -->
+    <div class="mobile-controls">
+        <a id="mobile-interact-button" class="mobile-button">
+            <img src="{{CDN_ASSETS_URL}}/icons/target.png" />
+        </a>
+        <a id="mobile-jump-button" class="mobile-button">
+            <img src="{{CDN_ASSETS_URL}}/icons/jump.png" />
+        </a>
+    </div>
+
+    <script>
+        // --- Element References ---
+        const countdownElement = document.getElementById('countdown-timer');
+        const questionOverlay = document.getElementById('quiz-question-overlay');
+        const questionTextElement = document.getElementById('question-text');
+        const mobileInteractButton = document.getElementById('mobile-interact-button');
+        const mobileJumpButton = document.getElementById('mobile-jump-button');
+
+        // --- Mobile Button Event Listeners ---
+        if (mobileInteractButton) {
+            mobileInteractButton.addEventListener('touchstart', e => {
+                e.preventDefault();
+                mobileInteractButton.classList.add('active');
+                hytopia.pressInput('ml', true);
+            });
+            mobileInteractButton.addEventListener('touchend', e => {
+                e.preventDefault();
+                mobileInteractButton.classList.remove('active');
+                hytopia.pressInput('ml', false);
+            });
+        }
+        if (mobileJumpButton) {
+            mobileJumpButton.addEventListener('touchstart', e => {
+                e.preventDefault();
+                mobileJumpButton.classList.add('active');
+                hytopia.pressInput(' ', true);
+            });
+            mobileJumpButton.addEventListener('touchend', e => {
+                e.preventDefault();
+                mobileJumpButton.classList.remove('active');
+                hytopia.pressInput(' ', false);
+            });
+        }
+
+        // --- HYTOPIA Data Handler ---
+        if (typeof hytopia !== 'undefined' && typeof hytopia.onData === 'function') {
+            hytopia.onData(data => {
+                // console.log('[Game UI] Received data:', JSON.stringify(data)); // Optional logging
+
+                if (data) {
+                    // --- Quiz Visibility (Countdown & Question) ---
+                    if (typeof data.showQuiz === 'boolean') {
+                        // console.log('[Game UI] Setting quiz display based on showQuiz:', data.showQuiz);
+                        const displayStyle = data.showQuiz ? 'block' : 'none';
+                        if (countdownElement) countdownElement.style.display = displayStyle;
+                        if (questionOverlay) questionOverlay.style.display = displayStyle;
+                    }
+
+                    // --- Countdown Time Update ---
+                    if (typeof data.remainingTime === 'number' && countdownElement) {
+                        countdownElement.innerText = `Time: ${data.remainingTime}`;
+                    }
+
+                    // --- Question Text Update ---
+                    if (typeof data.questionText === 'string' && questionTextElement) {
+                        questionTextElement.innerText = data.questionText;
+                    }
+                }
+            });
+        } else {
+            console.error('hytopia object or hytopia.onData is not available. This UI might not function outside the HYTOPIA client.');
+            // Optional: Add fallback behavior for testing outside HYTOPIA
+        }
+    </script>
+</body>
+</html>

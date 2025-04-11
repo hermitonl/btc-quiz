@@ -174,7 +174,11 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
 
             // Send initial time to UI
             const initialSeconds = Math.ceil(QUIZ_DURATION_MS / 1000);
-            participant.player.ui.sendData({ remainingTime: initialSeconds });
+            participant.player.ui.sendData({
+                remainingTime: initialSeconds,
+                questionText: question.q,
+                showQuiz: true // Explicitly show both UIs
+            });
 
             // Send messages
             if (questionIndex === 0) {
@@ -224,7 +228,7 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
         playerState.activeQuiz = null;
         playerState.lastProximityPlatformIndex = null;
         playerStates.set(username, playerState);
-        player.ui.sendData({ hide: true }); // Hide countdown UI
+        player.ui.sendData({ showQuiz: false }); // Hide both quiz UIs
 
         if (won) {
             // playerState.completedQuizzes.add(quizId); // Removed to allow repeats
@@ -376,8 +380,7 @@ startServer(async world => {
     playerStates.set(username, inMemoryState);
 
     // Load Mobile Controls UI
-    player.ui.load('ui/mobile-controls-index.html');
-    player.ui.load('ui/countdown-ui.html'); // Load countdown UI
+    player.ui.load('ui/game-ui.html'); // Load consolidated game UI
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'Use WASD to move around.');
     world.chatManager.sendPlayerMessage(player, 'Press space to jump.');
@@ -391,7 +394,7 @@ startServer(async world => {
     const username = player.username;
     console.log(`Player ${username} left.`);
     const playerState = playerStates.get(username);
-    player.ui.sendData({ hide: true }); // Attempt to hide countdown UI on leave
+    player.ui.sendData({ showQuiz: false }); // Attempt to hide both quiz UIs on leave
     if (currentMultiplayerQuiz && currentMultiplayerQuiz.participants.has(username)) {
         currentMultiplayerQuiz.participants.delete(username);
         console.log(`Removed ${username} from active multiplayer quiz.`);
