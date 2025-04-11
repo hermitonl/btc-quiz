@@ -172,6 +172,10 @@ function askQuestion(world: World, player: Player, quizId: string, questionIndex
             pState.lastProximityPlatformIndex = null;
             playerStates.set(participant.player.username, pState);
 
+            // Send initial time to UI
+            const initialSeconds = Math.ceil(QUIZ_DURATION_MS / 1000);
+            participant.player.ui.sendData({ remainingTime: initialSeconds });
+
             // Send messages
             if (questionIndex === 0) {
                  world.chatManager.sendPlayerMessage(participant.player, `--- Starting Quiz: ${quiz.topic} ---`, 'FFFFFF');
@@ -220,6 +224,7 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
         playerState.activeQuiz = null;
         playerState.lastProximityPlatformIndex = null;
         playerStates.set(username, playerState);
+        player.ui.sendData({ hide: true }); // Hide countdown UI
 
         if (won) {
             // playerState.completedQuizzes.add(quizId); // Removed to allow repeats
@@ -372,6 +377,7 @@ startServer(async world => {
 
     // Load Mobile Controls UI
     player.ui.load('ui/mobile-controls-index.html');
+    player.ui.load('ui/countdown-ui.html'); // Load countdown UI
     world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'Use WASD to move around.');
     world.chatManager.sendPlayerMessage(player, 'Press space to jump.');
@@ -385,6 +391,7 @@ startServer(async world => {
     const username = player.username;
     console.log(`Player ${username} left.`);
     const playerState = playerStates.get(username);
+    player.ui.sendData({ hide: true }); // Attempt to hide countdown UI on leave
     if (currentMultiplayerQuiz && currentMultiplayerQuiz.participants.has(username)) {
         currentMultiplayerQuiz.participants.delete(username);
         console.log(`Removed ${username} from active multiplayer quiz.`);
@@ -461,16 +468,10 @@ startServer(async world => {
                   }
               } else { if (playerState.lastProximityPlatformIndex !== null) { playerState.lastProximityPlatformIndex = null; } }
 
-              const timeSinceLastMessage = now - playerState.activeQuiz.lastTimerMessageSent;
-              const updateInterval = 5000;
-              if (timeSinceLastMessage > updateInterval) {
-                  const timeElapsed = now - questionStartTime;
-                  const remainingSeconds = Math.max(0, Math.ceil((QUIZ_DURATION_MS - timeElapsed) / 1000));
-                  if (remainingSeconds > 0) {
-                       world.chatManager.sendPlayerMessage(player, `[Quiz] Time Remaining: ${remainingSeconds}s`, 'FFA500');
-                  }
-                  playerState.activeQuiz.lastTimerMessageSent = now;
-              }
+              // Send time updates to UI on every tick
+              const timeElapsed = now - questionStartTime;
+              const remainingSeconds = Math.max(0, Math.ceil((QUIZ_DURATION_MS - timeElapsed) / 1000));
+              player.ui.sendData({ remainingTime: remainingSeconds });
           }); // End participant loop
 
           // --- Check for Timeout ---
