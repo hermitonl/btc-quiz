@@ -20,7 +20,7 @@
         /* --- Quiz Question Styles --- */
         #quiz-question-overlay {
             position: fixed;
-            top: 15%; /* Position below the countdown timer */
+            bottom: 15%; /* Position above the bottom */
             left: 50%;
             transform: translateX(-50%);
             width: 80%;
@@ -30,7 +30,7 @@
             padding: 20px;
             border-radius: 10px;
             text-align: center;
-            font-size: 24px;
+            font-size: 12px;
             font-family: 'Inter', sans-serif;
             z-index: 999; /* Below countdown timer */
             display: none; /* Hidden by default */
@@ -45,7 +45,7 @@
             flex-direction: column; /* Stack answers vertically */
             align-items: flex-start; /* Align text to the left */
             gap: 8px; /* Space between answers */
-            font-size: 18px; /* Slightly smaller font for answers */
+            font-size: 10px; /* Slightly smaller font for answers */
         }
         .answer-option {
             background-color: rgba(255, 255, 255, 0.1);
