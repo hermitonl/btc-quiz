@@ -95,6 +95,7 @@
             background-color: rgba(0, 0, 0, 0.75);
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
         }
+        /* Removed Start Music Button Style */
     </style>
 </head>
 <body>
@@ -117,6 +118,8 @@
         </a>
     </div>
 
+    <!-- Removed Start Music Button -->
+
     <script>
         // --- Element References ---
         const countdownElement = document.getElementById('countdown-timer');
@@ -125,6 +128,7 @@
         const answersContainer = document.getElementById('answers-container'); // Add reference
         const mobileInteractButton = document.getElementById('mobile-interact-button');
         const mobileJumpButton = document.getElementById('mobile-jump-button');
+        // Removed startMusicButton reference
 
         // --- Mobile Button Event Listeners ---
         if (mobileInteractButton) {
@@ -151,6 +155,8 @@
                 hytopia.pressInput(' ', false);
             });
         }
+
+        // Removed Start Music Button Listener block
 
         // --- HYTOPIA Data Handler ---
         if (typeof hytopia !== 'undefined' && typeof hytopia.onData === 'function') {

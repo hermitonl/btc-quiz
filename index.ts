@@ -11,6 +11,7 @@ import {
     ColliderShape,
     BlockType,
     ChatEvent,
+    // Button, // Removed - Not found in module
 } from 'hytopia';
 
 import worldMap from './assets/maps/payload-game-map.json';
@@ -401,6 +402,8 @@ startServer(async world => {
     world.chatManager.sendPlayerMessage(player, 'Hold shift to sprint.');
     world.chatManager.sendPlayerMessage(player, `Guest mode. Use /login <username> to save progress.`, 'FFA500');
     world.chatManager.sendPlayerMessage(player, `Balance: ${inMemoryState.sats} sats.`, 'FFFF00');
+
+    // Removed UI message listener for 'start_music' as client-side sending failed.
   });
 
   // --- Player Leave Logic ---
@@ -731,8 +734,19 @@ startServer(async world => {
  }
   // Removed stray closing bracket here
 
-  // --- Ambient Audio ---
-  new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 1.0 }).play(world);
+  // --- Ambient Audio (Deferred Playback) ---
+  // Revert to non-positional ambient audio
+  const backgroundMusic = new Audio({
+      uri: "audio/music/hytopia-main.mp3",
+      loop: true,
+      volume: 1.0, // Restore original volume
+  });
+  // Removed startBackgroundMusicOnce function and backgroundMusicStarted flag.
+  // .play() is not called automatically to avoid auto-play issues.
+  // Music will not play unless triggered by other game logic (currently none).
+  console.log("Background music object created but not played automatically.");
+
+  backgroundMusic.play(world); // Play the music in our world
 
   console.log("Bitcoin Learning Game server initialized.");
 
