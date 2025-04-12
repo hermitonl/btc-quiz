@@ -39,6 +39,11 @@ const lessons: Lesson[] = [
     { id: 'lesson1', npcName: 'InfoBot', text: 'Bitcoin is a decentralized digital currency...', reward: 1 },
     { id: 'lesson2', npcName: 'DataBot', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
     { id: 'lesson3', npcName: 'BitBot', text: 'New bitcoins are created through mining.', reward: 1 },
+    { id: 'lesson4', npcName: 'MinerMike', text: 'Bitcoin mining difficulty adjusts automatically to keep block creation time around 10 minutes.', reward: 1 },
+    { id: 'lesson5', npcName: 'WalletWendy', text: 'A Bitcoin wallet stores your private keys, allowing you to send and receive bitcoins.', reward: 1 },
+    { id: 'lesson6', npcName: 'KeyKeeper', text: 'Your public key is like your bank account number (shareable), while your private key is like your password (keep secret!).', reward: 1 },
+    { id: 'lesson7', npcName: 'AltcoinAlice', text: 'Altcoins are cryptocurrencies other than Bitcoin, like Ethereum or Solana.', reward: 1 },
+    { id: 'lesson8', npcName: 'RiskyRick', text: 'Cryptocurrencies can be volatile and risky investments. Never invest more than you can afford to lose.', reward: 1 },
 ];
 const quizzes: Quiz[] = [
     {
@@ -362,15 +367,21 @@ startServer(async world => {
               console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) at ${spawnPos.x},${spawnPos.y},${spawnPos.z}`);
           } else { console.error(`Failed to get ID for spawned NPC: ${config.name}`); }
       };
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBot' });
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -7, y: 1.65, z: 12 }, type: 'knowledge', dataId: 'lesson3', name: 'BitBot' });
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1.9, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
+      //spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
+      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 5, y: 1.9, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
+      spawnNpc({ model: 'models/npcs/squid.gltf', scale: 0.4, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBot' });
+      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.4, pos: { x: -7, y: 1.6, z: 12 }, type: 'knowledge', dataId: 'lesson3', name: 'BitBot' });
+      spawnNpc({ model: 'models/players/robocop.gltf', scale: 1.5, pos: { x: 0, y: 1.65, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
+      spawnNpc({ model: 'models/npcs/stalker.gltf', scale: 0.4, pos: { x: 10, y: 1.55, z: 10 }, type: 'knowledge', dataId: 'lesson4', name: 'MinerMike' });
+      spawnNpc({ model: 'models/npcs/ripper-boss.gltf', scale: 0.4, pos: { x: -10, y: 1.8, z: 10 }, type: 'knowledge', dataId: 'lesson5', name: 'WalletWendy' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 10, y: 1.65, z: -10 }, type: 'knowledge', dataId: 'lesson6', name: 'KeyKeeper' });
+      spawnNpc({ model: 'models/players/player-with-gun.gltf', scale: 0.4, pos: { x: -10, y: 1.55, z: -10 }, type: 'knowledge', dataId: 'lesson7', name: 'AltcoinAlice' });
+      spawnNpc({ model: 'models/npcs/zombie.gltf', scale: 0.4, pos: { x: 3, y: 1.55, z: 25 }, type: 'knowledge', dataId: 'lesson8', name: 'RiskyRick' });
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
   // --- Player Join Logic ---
   world.on(PlayerEvent.JOINED_WORLD, async ({ player }) => {
-    const playerEntity = new PlayerEntity({ player, name: player.username, modelUri: 'models/players/robocop.gltf', modelScale: 1.5 });
+    const playerEntity = new PlayerEntity({ player, name: player.username, modelUri: 'models/players/player.gltf', modelScale: 0.5 });
     playerEntity.spawn(world, DEFAULT_SPAWN_POS);
     const username = player.username;
     console.log(`Player ${username} joined.`);
