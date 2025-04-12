@@ -13,7 +13,7 @@ import {
     ChatEvent,
 } from 'hytopia';
 
-import worldMap from './assets/maps/boilerplate.json';
+import worldMap from './assets/maps/payload-game-map.json';
 import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database';
 import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, DbPlayerState } from './src/types';
 
@@ -364,7 +364,7 @@ startServer(async world => {
       };
       spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
       spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBot' });
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -10, y: 1.65, z: 15 }, type: 'knowledge', dataId: 'lesson3', name: 'BitBot' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -7, y: 1.65, z: 12 }, type: 'knowledge', dataId: 'lesson3', name: 'BitBot' });
       spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 0, y: 1.9, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
@@ -721,7 +721,7 @@ startServer(async world => {
   // Removed stray closing bracket here
 
   // --- Ambient Audio ---
-  new Audio({ uri: 'audio/music/hytopia-main.mp3', loop: true, volume: 1.0 }).play(world);
+  new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 1.0 }).play(world);
 
   console.log("Bitcoin Learning Game server initialized.");
 
