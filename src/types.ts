@@ -33,6 +33,7 @@ export interface InMemoryPlayerState {
     playerObject?: Player; // Reference to the player object (transient, only valid while connected)
     lastProximityPlatformIndex?: number | null; // Track last platform proximity message sent
     showingKnowledgeNpcId?: number | null; // Track which knowledge NPC's UI is currently shown
+    showingQuizPromptNpcId?: number | null; // Track which quiz NPC's prompt UI is currently shown
 }
 
 // --- Shared Definitions ---

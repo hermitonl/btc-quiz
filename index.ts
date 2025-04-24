@@ -321,18 +321,52 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
             playerStates.set(username, playerState); // Update state (covers showingKnowledgeNpcId and completedLessons)
         }
     } else if (npcInfo.type === 'quiz') {
+        // Ensure playerState is defined here as well (redundant check based on function start, but safe)
+        if (!playerState) { console.error(`Player state lost before quiz check for ${username}.`); return; }
+
         if (currentMultiplayerQuiz || playerState.activeQuiz) {
              console.log(`Player ${username} interacted with quiz NPC while a quiz is active.`);
+             // Keep chat message for active quiz conflict
              world.chatManager.sendPlayerMessage(player, `[Quiz Master]: A quiz is already in progress!`, 'FFA500');
+             // Also hide any potentially open prompt UI
+             if (playerState.showingQuizPromptNpcId !== null) {
+                 player.ui.sendData({ type: 'hideQuizPrompt' });
+                 playerState.showingQuizPromptNpcId = null;
+                 playerStates.set(username, playerState); // Update state
+             }
              return;
         }
+
         const quiz = quizzes.find(q => q.id === npcInfo.dataId);
-        if (quiz) {
-            // Removed completed check
-            world.chatManager.sendPlayerMessage(player, `[${quiz.npcName}]: Ready for the "${quiz.topic}" quiz? Cost: ${quiz.cost} sats.`, 'FFFF00');
-            const shortQuizId = quiz.id.replace('quiz', 'q');
-            world.chatManager.sendPlayerMessage(player, `Type /q to start a round with players in the zone!`, 'ADD8E6');
-        } else { console.error(`Quiz NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`); }
+        if (!quiz) {
+            console.error(`Quiz NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`);
+            return; // Exit if quiz data is bad
+        }
+
+        if (playerState.showingQuizPromptNpcId === npcEntityId) {
+            // Currently showing this NPC's prompt, hide it
+            player.ui.sendData({ type: 'hideQuizPrompt' });
+            playerState.showingQuizPromptNpcId = null;
+            console.log(`Player ${username} hid quiz prompt UI for NPC ${npcEntityId}`);
+            playerStates.set(username, playerState); // Update state
+        } else {
+            // Show this NPC's prompt (or switch from another)
+            player.ui.sendData({
+                type: 'showQuizPrompt',
+                npcName: quiz.npcName,
+                topic: quiz.topic,
+                cost: quiz.cost,
+                quizId: quiz.id // Send quizId for instructions
+            });
+            playerState.showingQuizPromptNpcId = npcEntityId;
+            // Also hide knowledge UI if it was open
+            if (playerState.showingKnowledgeNpcId !== null) {
+                 player.ui.sendData({ type: 'hideKnowledge' });
+                 playerState.showingKnowledgeNpcId = null;
+            }
+            console.log(`Player ${username} showed quiz prompt UI for NPC ${npcEntityId}`);
+            playerStates.set(username, playerState); // Update state
+        }
     }
 }
 
@@ -412,7 +446,8 @@ startServer(async world => {
         activeQuiz: null, isGuest: true, isAuthenticated: false,
         loggedInUsername: null, pendingQuizId: null,
         playerObject: player, lastProximityPlatformIndex: null,
-        showingKnowledgeNpcId: null, // Initialize the new state property
+        showingKnowledgeNpcId: null,
+        showingQuizPromptNpcId: null, // Initialize the new state property
     };
     playerStates.set(username, inMemoryState);
 
@@ -490,6 +525,30 @@ startServer(async world => {
                           player.ui.sendData({ type: 'hideKnowledge' });
                           playerState.showingKnowledgeNpcId = null;
                           // No need to call playerStates.set here, modifying object in map iteration
+                      }
+                  }
+              }
+
+              // --- Quiz Prompt UI Distance Check ---
+              if (typeof playerState.showingQuizPromptNpcId === 'number') {
+                  const currentNpcId = playerState.showingQuizPromptNpcId;
+                  const player = playerState.playerObject;
+                  const npcInfo = npcs.get(currentNpcId);
+
+                  if (player && npcInfo) { // Check if player and npcInfo exist
+                      const playerEntities = world.entityManager.getPlayerEntitiesByPlayer(player);
+                      const playerEntity = playerEntities.length > 0 ? playerEntities[0] : undefined;
+
+                      if (playerEntity?.position) {
+                          const dx = playerEntity.position.x - npcInfo.position.x;
+                          const dz = playerEntity.position.z - npcInfo.position.z;
+                          const distSq = dx * dx + dz * dz;
+                          if (distSq > HIDE_DISTANCE_THRESHOLD_SQ) {
+                              console.log(`[TickCheck] Player ${username} moved too far from NPC ${currentNpcId}. Hiding quiz prompt UI. DistSq: ${distSq.toFixed(2)}`);
+                              player.ui.sendData({ type: 'hideQuizPrompt' });
+                              playerState.showingQuizPromptNpcId = null;
+                              // No need to call playerStates.set here
+                          }
                       }
                   }
               }
