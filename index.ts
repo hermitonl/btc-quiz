@@ -69,7 +69,7 @@ const quizzes: Quiz[] = [
 const playerStates = new Map<string, InMemoryPlayerState>(); // Key: player.username
 
 // --- NPC Management ---
-interface NpcInfo { type: 'knowledge' | 'quiz'; dataId: string; }
+interface NpcInfo { type: 'knowledge' | 'quiz'; dataId: string; position: Vector3; } // Added position
 const npcs = new Map<number, NpcInfo>(); // Key: Entity ID
 
 // --- Global Multiplayer Quiz State ---
@@ -384,7 +384,8 @@ startServer(async world => {
           const spawnPos = new Vector3(config.pos.x, config.pos.y, config.pos.z);
           npcEntity.spawn(world, spawnPos);
           if (npcEntity.id !== undefined) {
-              npcs.set(npcEntity.id, { type: config.type, dataId: config.dataId });
+              // Store the position along with other info
+              npcs.set(npcEntity.id, { type: config.type, dataId: config.dataId, position: spawnPos });
               console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) at ${spawnPos.x},${spawnPos.y},${spawnPos.z}`);
           } else { console.error(`Failed to get ID for spawned NPC: ${config.name}`); }
       };
@@ -461,9 +462,44 @@ startServer(async world => {
   const tickIntervalMs = 250;
   const gameTickInterval = setInterval(() => {
       try {
-          if (!currentMultiplayerQuiz) return;
+          const now = Date.now(); // Define 'now' once for the tick
+          const HIDE_DISTANCE_THRESHOLD_SQ = 3.0 * 3.0; // Hide if > 3 units away (squared)
 
-          const now = Date.now();
+          // --- Knowledge UI Distance Check ---
+          playerStates.forEach((playerState, username) => {
+              // Ensure showingKnowledgeNpcId is a number before proceeding
+              if (typeof playerState.showingKnowledgeNpcId === 'number') {
+                  const currentNpcId = playerState.showingKnowledgeNpcId; // Use a new const for clarity
+                  const player = playerState.playerObject; // Get player object from state
+                  const npcInfo = npcs.get(currentNpcId); // Use the guaranteed number
+
+                  // Skip if player object or NPC info is missing for this tick
+                  if (!player || !npcInfo) return;
+
+                  const playerEntities = world.entityManager.getPlayerEntitiesByPlayer(player);
+                  const playerEntity = playerEntities.length > 0 ? playerEntities[0] : undefined;
+
+                  // Skip if player entity or position is missing for this tick
+                  if (playerEntity?.position) {
+                      // Calculate horizontal distance squared manually
+                      const dx = playerEntity.position.x - npcInfo.position.x;
+                      const dz = playerEntity.position.z - npcInfo.position.z;
+                      const distSq = dx * dx + dz * dz; // Horizontal distance squared
+                      if (distSq > HIDE_DISTANCE_THRESHOLD_SQ) {
+                          console.log(`[TickCheck] Player ${username} moved too far from NPC ${currentNpcId}. Hiding knowledge UI. DistSq: ${distSq.toFixed(2)}`);
+                          player.ui.sendData({ type: 'hideKnowledge' });
+                          playerState.showingKnowledgeNpcId = null;
+                          // No need to call playerStates.set here, modifying object in map iteration
+                      }
+                  }
+              }
+          });
+
+          // --- Multiplayer Quiz Logic (Existing) ---
+          if (!currentMultiplayerQuiz) return; // Existing quiz logic starts here
+// Remove the redeclaration of 'now' as it's defined at the start of the try block
+// const now = Date.now();
+          // Remove duplicate declaration from line 501
           const activeQuizId = currentMultiplayerQuiz.quizId;
           const activeQuestionIndex = currentMultiplayerQuiz.questionIndex;
           const questionStartTime = currentMultiplayerQuiz.questionStartTime;
