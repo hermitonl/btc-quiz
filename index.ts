@@ -21,7 +21,7 @@ import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, 
 // --- Background Music ---
 // NOTE: Playback might be unreliable due to browser auto-play restrictions.
 // Initial play should be triggered by client-side interaction.
-const mainMusic = new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 0.8 });
+const mainMusic = new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 0.6 });
 const quizMusic = new Audio({ uri: "audio/music/to-the-death.mp3", loop: true, volume: 0.8 });
 
 // --- Constants ---
@@ -132,6 +132,14 @@ function buildPlatform(world: World, center: Vector3, blockTypeId: number): bool
 // These functions rely on 'world' being available in their call scope (passed from handlers inside startServer)
 function askQuestion(world: World, player: Player, quizId: string, questionIndex: number) {
     const quiz = quizzes.find(q => q.id === quizId);
+
+    try {
+        console.log("Attempting to play main music after interact with a NPC");
+        //mainMusic.pause();
+        quizMusic.play(world);
+    } catch (audioError) {
+        console.warn("Error controlling music on quiz end:", audioError);
+    }
 
     // Check global state exists and matches
     if (!currentMultiplayerQuiz || currentMultiplayerQuiz.quizId !== quizId || !quiz) {
@@ -275,7 +283,7 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
     // --- Music Transition: End Quiz ---
     try {
         console.log("Attempting to play main music (quiz music cannot be reliably stopped).");
-        // quizMusic.stop(); // No stop method available
+        // quizMusic.pause(); 
         mainMusic.play(world); // Attempt to play main theme
     } catch (audioError) {
         console.warn("Error controlling music on quiz end:", audioError);
@@ -296,7 +304,7 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
 function handleNpcInteraction(world: World, player: Player, npcEntityId: number | undefined) {
 
     try {
-        console.log("Attempting to play main music after game initialized");
+        console.log("Attempting to play main music after interact with a NPC");
         mainMusic.play(world);
     } catch (audioError) {
         console.warn("Error controlling music on quiz end:", audioError);
