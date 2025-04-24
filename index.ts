@@ -294,6 +294,14 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
 
 // Must be called within startServer scope
 function handleNpcInteraction(world: World, player: Player, npcEntityId: number | undefined) {
+
+    try {
+        console.log("Attempting to play main music after game initialized");
+        mainMusic.play(world);
+    } catch (audioError) {
+        console.warn("Error controlling music on quiz end:", audioError);
+    }
+
     const username = player.username;
     if (npcEntityId === undefined) return;
     const npcInfo = npcs.get(npcEntityId);
@@ -854,16 +862,6 @@ startServer(async world => {
       });
       if (actualParticipantsCount === 0) { console.log("Quiz start aborted, no participants after charging."); return; }
 
-      // --- Music Transition: Start Quiz ---
-      try {
-          console.log("Attempting to play quiz music (main music cannot be reliably stopped).");
-          // mainMusic.stop(); // No stop method available
-          quizMusic.play(world); // Attempt to play quiz theme
-      } catch (audioError) {
-          console.warn("Error controlling music on quiz start:", audioError);
-      }
-      // --- End Music Transition ---
-
       // Set the global state
       const globalQuizState = {
           quizId: quizId,
@@ -904,20 +902,6 @@ startServer(async world => {
       }
  }
   // Removed stray closing bracket here
-
-  // --- Ambient Audio (Deferred Playback) ---
-  // Revert to non-positional ambient audio
-  const backgroundMusic = new Audio({
-      uri: "audio/music/hytopia-main.mp3",
-      loop: true,
-      volume: 1.0, // Restore original volume
-  });
-  // Removed startBackgroundMusicOnce function and backgroundMusicStarted flag.
-  // .play() is not called automatically to avoid auto-play issues.
-  // Music will not play unless triggered by other game logic (currently none).
-  console.log("Background music object created but not played automatically.");
-
-  backgroundMusic.play(world); // Play the music in our world
 
   console.log("Bitcoin Learning Game server initialized.");
 
