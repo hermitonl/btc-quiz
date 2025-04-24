@@ -289,17 +289,37 @@ function handleNpcInteraction(world: World, player: Player, npcEntityId: number 
 
     if (npcInfo.type === 'knowledge') {
         const lesson = lessons.find(l => l.id === npcInfo.dataId);
-        if (lesson) {
-            world.chatManager.sendPlayerMessage(player, `[${lesson.npcName}]: ${lesson.text}`, 'ADD8E6');
+        if (!lesson) {
+            console.error(`Knowledge NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`);
+            return; // Exit early if lesson data is bad
+        }
+
+        if (playerState.showingKnowledgeNpcId === npcEntityId) {
+            // Currently showing this NPC's lesson, hide it
+            player.ui.sendData({ type: 'hideKnowledge' });
+            playerState.showingKnowledgeNpcId = null;
+            console.log(`Player ${username} hid knowledge UI for NPC ${npcEntityId}`);
+            playerStates.set(username, playerState); // Update state
+        } else {
+            // Show this NPC's lesson (or switch from another)
+            player.ui.sendData({ type: 'showKnowledge', text: lesson.text, npcName: lesson.npcName });
+            playerState.showingKnowledgeNpcId = npcEntityId;
+            console.log(`Player ${username} showed knowledge UI for NPC ${npcEntityId}`);
+
+            // Award sats/mark complete only when initially showing the lesson text
             if (!playerState.completedLessons.has(lesson.id)) {
                 playerState.completedLessons.add(lesson.id);
                 const reward = lesson.reward;
                 if (updateSats(username, reward)) {
                     world.chatManager.sendPlayerMessage(player, `+${reward} Sat! Lesson complete. Balance: ${playerState.sats} sats.`, '00FF00');
-                } else { world.chatManager.sendPlayerMessage(player, `Lesson complete, failed to update sats.`, 'FF0000'); }
-                playerStates.set(username, playerState);
-            } else { world.chatManager.sendPlayerMessage(player, `You already learned this.`, 'FFFF00'); }
-        } else { console.error(`Knowledge NPC ${npcEntityId} has invalid dataId: ${npcInfo.dataId}`); }
+                } else {
+                    world.chatManager.sendPlayerMessage(player, `Lesson complete, failed to update sats.`, 'FF0000');
+                }
+            }
+            // No "already learned" message needed here, UI just shows again.
+
+            playerStates.set(username, playerState); // Update state (covers showingKnowledgeNpcId and completedLessons)
+        }
     } else if (npcInfo.type === 'quiz') {
         if (currentMultiplayerQuiz || playerState.activeQuiz) {
              console.log(`Player ${username} interacted with quiz NPC while a quiz is active.`);
@@ -391,6 +411,7 @@ startServer(async world => {
         activeQuiz: null, isGuest: true, isAuthenticated: false,
         loggedInUsername: null, pendingQuizId: null,
         playerObject: player, lastProximityPlatformIndex: null,
+        showingKnowledgeNpcId: null, // Initialize the new state property
     };
     playerStates.set(username, inMemoryState);
 
@@ -611,6 +632,11 @@ startServer(async world => {
 
           const randomIndex = Math.floor(Math.random() * quizzes.length);
           const randomQuiz = quizzes[randomIndex];
+          if (!randomQuiz) { // Add check to satisfy TypeScript
+              console.error(`[/q Command] Failed to get random quiz at index ${randomIndex} despite non-empty array.`);
+              world.chatManager.sendPlayerMessage(player, `[System]: Error selecting a random quiz.`, 'FF0000');
+              return;
+          }
           initiateQuiz(world, randomQuiz, player); // Call the refactored function
 
       } else if (message.startsWith('/q ')) { // Handle '/q <id>' for specific quiz

@@ -56,6 +56,38 @@
             text-align: left;
         }
 
+        /* --- Knowledge NPC Overlay Styles --- */
+        #knowledge-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 500px;
+            background-color: rgba(30, 30, 50, 0.85); /* Dark blueish background */
+            color: #e0e0e0; /* Light grey text */
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: left;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            z-index: 998; /* Below quiz, above game */
+            display: none; /* Hidden by default */
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+        }
+        #knowledge-npc-name {
+            font-weight: bold;
+            color: #a0a0ff; /* Light purple for name */
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+        #knowledge-text {
+            line-height: 1.6;
+        }
+
         /* --- Mobile Controls Styles --- */
         .mobile-controls {
             display: none; /* Hidden by default */
@@ -108,6 +140,12 @@
         <div id="answers-container"></div> <!-- Container for answers -->
     </div>
 
+    <!-- Knowledge NPC Overlay Element -->
+    <div id="knowledge-overlay">
+        <div id="knowledge-npc-name">NPC Name</div>
+        <p id="knowledge-text">Lesson text will appear here.</p>
+    </div>
+
     <!-- Mobile Controls Elements -->
     <div class="mobile-controls">
         <a id="mobile-interact-button" class="mobile-button">
@@ -125,7 +163,10 @@
         const countdownElement = document.getElementById('countdown-timer');
         const questionOverlay = document.getElementById('quiz-question-overlay');
         const questionTextElement = document.getElementById('question-text');
-        const answersContainer = document.getElementById('answers-container'); // Add reference
+        const answersContainer = document.getElementById('answers-container');
+        const knowledgeOverlay = document.getElementById('knowledge-overlay');
+        const knowledgeNpcNameElement = document.getElementById('knowledge-npc-name');
+        const knowledgeTextElement = document.getElementById('knowledge-text');
         const mobileInteractButton = document.getElementById('mobile-interact-button');
         const mobileJumpButton = document.getElementById('mobile-jump-button');
         // Removed startMusicButton reference
@@ -197,6 +238,15 @@
                         answerDiv.innerText = `[${index + 1}] ${answer}`;
                         answersContainer.appendChild(answerDiv);
                     });
+                }
+
+                // --- Knowledge NPC Overlay ---
+                if (data.type === 'showKnowledge' && knowledgeOverlay && knowledgeNpcNameElement && knowledgeTextElement) {
+                    knowledgeNpcNameElement.innerText = data.npcName || 'Information';
+                    knowledgeTextElement.innerText = data.text || '...';
+                    knowledgeOverlay.style.display = 'block';
+                } else if (data.type === 'hideKnowledge' && knowledgeOverlay) {
+                    knowledgeOverlay.style.display = 'none';
                 }
             });
         } else {

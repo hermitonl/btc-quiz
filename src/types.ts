@@ -32,6 +32,7 @@ export interface InMemoryPlayerState {
     pendingQuizId: string | null; // ID of the quiz the player intends to start via /confirmquiz
     playerObject?: Player; // Reference to the player object (transient, only valid while connected)
     lastProximityPlatformIndex?: number | null; // Track last platform proximity message sent
+    showingKnowledgeNpcId?: number | null; // Track which knowledge NPC's UI is currently shown
 }
 
 // --- Shared Definitions ---
