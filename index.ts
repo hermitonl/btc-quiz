@@ -18,6 +18,12 @@ import worldMap from './assets/maps/payload-game-map.json';
 import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database';
 import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, DbPlayerState } from './src/types';
 
+// --- Background Music ---
+// NOTE: Playback might be unreliable due to browser auto-play restrictions.
+// Initial play should be triggered by client-side interaction.
+const mainMusic = new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 0.8 });
+const quizMusic = new Audio({ uri: "audio/music/to-the-death.mp3", loop: true, volume: 0.8 });
+
 // --- Constants ---
 const DEFAULT_SPAWN_POS = new Vector3(0, 0.67, 1); // Default player spawn location
 const QUIZ_DURATION_MS = 15 * 1000; // 15 seconds per question
@@ -266,6 +272,16 @@ function endQuiz(world: World, player: Player, quizId: string, won: boolean, rea
          console.warn(`endQuiz called for ${username} quiz ${quizId}, but they were not active in it.`);
     }
 
+    // --- Music Transition: End Quiz ---
+    try {
+        console.log("Attempting to play main music (quiz music cannot be reliably stopped).");
+        // quizMusic.stop(); // No stop method available
+        mainMusic.play(world); // Attempt to play main theme
+    } catch (audioError) {
+        console.warn("Error controlling music on quiz end:", audioError);
+    }
+    // --- End Music Transition ---
+
     // Check if this player was the last one playing in the global quiz
     if (currentMultiplayerQuiz?.quizId === quizId) {
         currentMultiplayerQuiz.participants.delete(username); // Remove player regardless of win/loss
@@ -381,6 +397,7 @@ startServer(async world => {
 
   world.loadMap(worldMap);
   console.log("Main world map loaded.");
+
 
   // --- Build Quiz Platforms Dynamically ---
   console.log("Building quiz platforms near spawn using chunkLattice...");
@@ -836,6 +853,26 @@ startServer(async world => {
            }
       });
       if (actualParticipantsCount === 0) { console.log("Quiz start aborted, no participants after charging."); return; }
+
+      // --- Music Transition: Start Quiz ---
+      try {
+          console.log("Attempting to play quiz music (main music cannot be reliably stopped).");
+          // mainMusic.stop(); // No stop method available
+          quizMusic.play(world); // Attempt to play quiz theme
+      } catch (audioError) {
+          console.warn("Error controlling music on quiz start:", audioError);
+      }
+      // --- End Music Transition ---
+
+      // Set the global state
+      const globalQuizState = {
+          quizId: quizId,
+          questionIndex: -1, // Will be set by askQuestion
+          questionStartTime: 0, // Will be set by askQuestion
+          participants: participants,
+          questionEndTime: null
+      };
+      currentMultiplayerQuiz = globalQuizState; // Set the global state
 
       // Hide prompt UI for all participants now that quiz is starting
       participants.forEach(participant => {
