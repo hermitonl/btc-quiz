@@ -316,7 +316,7 @@
                     // Generate instructions based on quiz ID
                     const shortQuizId = data.quizId ? data.quizId.replace('quiz', 'q') : null;
                     quizPromptInstructionsElement.innerHTML = shortQuizId
-                        ? `Type <code>/q ${shortQuizId}</code> or <code>/q</code> to start a round!`
+                        ? `Type <code>/q</code> to start a round!`
                         : `Type <code>/q</code> to start a round!`;
                     quizPromptOverlay.style.display = 'block';
                 } else if (data.type === 'hideQuizPrompt' && quizPromptOverlay) {

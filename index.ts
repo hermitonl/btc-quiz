@@ -737,7 +737,7 @@ startServer(async world => {
       } else if (message.startsWith('/q ')) { // Handle '/q <id>' for specific quiz
            const shortQuizIdArg = message.substring('/q '.length).trim();
            if (!shortQuizIdArg.startsWith('q') || shortQuizIdArg.length <= 1) {
-                world.chatManager.sendPlayerMessage(player, `Invalid quiz format. Use /q q1, /q q2 etc., or just /q for random.`, 'FFA500'); return;
+                world.chatManager.sendPlayerMessage(player, `Invalid quiz format. Use just /q to start a round!.`, 'FFA500'); return;
            }
            const quizId = shortQuizIdArg.replace('q', 'quiz');
            const quiz = quizzes.find(q => q.id === quizId);
@@ -836,9 +836,22 @@ startServer(async world => {
            }
       });
       if (actualParticipantsCount === 0) { console.log("Quiz start aborted, no participants after charging."); return; }
-  
-      participants.forEach(p => { world.chatManager.sendPlayerMessage(p.player, `Starting "${quiz.topic}" quiz for ${actualParticipantsCount} players!`, '00FF00'); });
-  
+
+      // Hide prompt UI for all participants now that quiz is starting
+      participants.forEach(participant => {
+          const pState = playerStates.get(participant.player.username);
+          // Ensure pState exists before trying to hide UI or update state
+          if (pState) {
+              if (pState.showingQuizPromptNpcId !== null) {
+                  participant.player.ui.sendData({ type: 'hideQuizPrompt' });
+                  pState.showingQuizPromptNpcId = null;
+                  playerStates.set(participant.player.username, pState); // Update state
+              }
+          }
+          // Send starting message
+          world.chatManager.sendPlayerMessage(participant.player, `Starting "${quiz.topic}" quiz for ${actualParticipantsCount} players!`, '00FF00');
+      });
+
       currentMultiplayerQuiz = {
            quizId: quizId, questionIndex: -1, questionStartTime: 0,
            participants: participants, questionEndTime: null
