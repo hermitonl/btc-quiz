@@ -14,7 +14,7 @@ import {
     // Button, // Removed - Not found in module
 } from 'hytopia';
 
-import worldMap from './assets/maps/payload-game-map.json';
+import worldMap from './assets/maps/map0.json';
 import { initializeDatabase, loadPlayerData, savePlayerData } from './src/database';
 import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, DbPlayerState } from './src/types';
 
@@ -22,10 +22,10 @@ import type { InMemoryPlayerState, Lesson, Quiz, QuizQuestion, ActiveQuizState, 
 // NOTE: Playback might be unreliable due to browser auto-play restrictions.
 // Initial play should be triggered by client-side interaction.
 const mainMusic = new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 0.6 });
-const quizMusic = new Audio({ uri: "audio/music/to-the-death.mp3", loop: true, volume: 0.8 });
+const quizMusic = new Audio({ uri: "audio/music/hytopia-main.mp3", loop: true, volume: 0.8 });
 
 // --- Constants ---
-const DEFAULT_SPAWN_POS = new Vector3(0, 0.67, 1); // Default player spawn location
+const DEFAULT_SPAWN_POS = new Vector3(0, 0.67, 18); // Default player spawn location
 const QUIZ_DURATION_MS = 15 * 1000; // 15 seconds per question
 const QUIZ_PLATFORM_Y = 0.1; // Y level slightly above ground for detection
 const QUIZ_PLATFORM_CENTERS: Vector3[] = [
@@ -43,14 +43,15 @@ const QUIZ_ZONE_MAX = new Vector3( 6, 5, 13);  // Max coords for players to be i
 
 // --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
-    { id: 'lesson1', npcName: 'InfoBot', text: 'Bitcoin is a decentralized digital currency...', reward: 1 },
-    { id: 'lesson2', npcName: 'DataBot', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
-    { id: 'lesson3', npcName: 'BitBot', text: 'New bitcoins are created through mining.', reward: 1 },
-    { id: 'lesson4', npcName: 'MinerMike', text: 'Bitcoin mining difficulty adjusts automatically to keep block creation time around 10 minutes.', reward: 1 },
-    { id: 'lesson5', npcName: 'WalletWendy', text: 'A Bitcoin wallet stores your private keys, allowing you to send and receive bitcoins.', reward: 1 },
-    { id: 'lesson6', npcName: 'KeyKeeper', text: 'Your public key is like your bank account number (shareable), while your private key is like your password (keep secret!).', reward: 1 },
-    { id: 'lesson7', npcName: 'AltcoinAlice', text: 'Altcoins are cryptocurrencies other than Bitcoin, like Ethereum or Solana.', reward: 1 },
-    { id: 'lesson8', npcName: 'RiskyRick', text: 'Cryptocurrencies can be volatile and risky investments. Never invest more than you can afford to lose.', reward: 1 },
+    { id: 'lesson0', npcName: 'InfoBot00', text: 'Welcome to Hermit Online!', reward: 1 },
+    { id: 'lesson1', npcName: 'InfoBot01', text: 'Bitcoin is a decentralized digital currency.', reward: 1 },
+    { id: 'lesson2', npcName: 'InfoBot02', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
+    { id: 'lesson3', npcName: 'InfoBot03', text: 'New bitcoins are created through mining.', reward: 1 },
+    { id: 'lesson4', npcName: 'InfoBot04', text: 'Bitcoin mining difficulty adjusts automatically to keep block creation time around 10 minutes.', reward: 1 },
+    { id: 'lesson5', npcName: 'InfoBot05', text: 'A Bitcoin wallet stores your private keys, allowing you to send and receive bitcoins.', reward: 1 },
+    { id: 'lesson6', npcName: 'InfoBot06', text: 'Your public key is like your bank account number (shareable), while your private key is like your password (keep secret!).', reward: 1 },
+    { id: 'lesson7', npcName: 'InfoBot07', text: 'Altcoins are cryptocurrencies other than Bitcoin, like Ethereum or Solana.', reward: 1 },
+    { id: 'lesson8', npcName: 'InfoBot08', text: 'Cryptocurrencies can be volatile and risky investments. Never invest more than you can afford to lose.', reward: 1 },
 ];
 const quizzes: Quiz[] = [
     {
@@ -417,7 +418,7 @@ startServer(async world => {
 
   // --- Build Quiz Platforms Dynamically ---
   console.log("Building quiz platforms near spawn using chunkLattice...");
-  const platformBlockTypeIds = [23, 24, 25, 26]; // refer maps/boilerplate.json for IDs
+  const platformBlockTypeIds = [23, 24, 25, 26]; // refer maps/map0.json for IDs
   let canBuildPlatforms = true;
   QUIZ_PLATFORM_CENTERS.forEach((center, index) => {
       if (canBuildPlatforms) {
@@ -456,16 +457,24 @@ startServer(async world => {
               console.log(`Spawned ${config.type} NPC: ${config.name} (ID: ${npcEntity.id}) at ${spawnPos.x},${spawnPos.y},${spawnPos.z}`);
           } else { console.error(`Failed to get ID for spawned NPC: ${config.name}`); }
       };
-      //spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
-      spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: 5, y: 1.9, z: -5 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot' });
-      spawnNpc({ model: 'models/npcs/squid.gltf', scale: 0.4, pos: { x: -5, y: 1.65, z: -5 }, type: 'knowledge', dataId: 'lesson2', name: 'DataBot' });
-      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.4, pos: { x: -7, y: 1.6, z: 12 }, type: 'knowledge', dataId: 'lesson3', name: 'BitBot' });
       spawnNpc({ model: 'models/players/robocop.gltf', scale: 1.5, pos: { x: 0, y: 1.65, z: 5 }, type: 'quiz', dataId: 'quiz1', name: 'QuizMind' });
-      spawnNpc({ model: 'models/npcs/stalker.gltf', scale: 0.4, pos: { x: 10, y: 1.55, z: 10 }, type: 'knowledge', dataId: 'lesson4', name: 'MinerMike' });
-      spawnNpc({ model: 'models/npcs/ripper-boss.gltf', scale: 0.4, pos: { x: -10, y: 1.8, z: 10 }, type: 'knowledge', dataId: 'lesson5', name: 'WalletWendy' });
-      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 10, y: 1.65, z: -10 }, type: 'knowledge', dataId: 'lesson6', name: 'KeyKeeper' });
-      spawnNpc({ model: 'models/players/player-with-gun.gltf', scale: 0.4, pos: { x: -10, y: 1.55, z: -10 }, type: 'knowledge', dataId: 'lesson7', name: 'AltcoinAlice' });
-      spawnNpc({ model: 'models/npcs/zombie.gltf', scale: 0.4, pos: { x: 3, y: 1.55, z: 25 }, type: 'knowledge', dataId: 'lesson8', name: 'RiskyRick' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -0.5, y: 1.65, z: 16.5 }, type: 'knowledge', dataId: 'lesson0', name: 'InfoBot00' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -10, y: 1.65, z: 12 }, type: 'knowledge', dataId: 'lesson1', name: 'InfoBot01' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -10, y: 1.65, z: -10 }, type: 'knowledge', dataId: 'lesson2', name: 'InfoBot02' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 10, y: 1.65, z: -15 }, type: 'knowledge', dataId: 'lesson3', name: 'InfoBot03' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: -1, y: 1.65, z: 45 }, type: 'knowledge', dataId: 'lesson4', name: 'InfoBot04' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 3, y: 1.65, z: 73 }, type: 'knowledge', dataId: 'lesson5', name: 'InfoBot05' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 35, y: 1.65, z: 2 }, type: 'knowledge', dataId: 'lesson6', name: 'InfoBot06' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 65, y: 1.65, z: 5 }, type: 'knowledge', dataId: 'lesson7', name: 'InfoBot07' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 61, y: 1.65, z: -71 }, type: 'knowledge', dataId: 'lesson8', name: 'InfoBot08' });
+      /*spawnNpc({ model: 'models/npcs/mindflayer.gltf', scale: 0.4, pos: { x: -1, y: 1.9, z: 45 }, type: 'knowledge', dataId: 'lesson4', name: 'InfoBot' });
+      spawnNpc({ model: 'models/npcs/squid.gltf', scale: 0.4, pos: { x: 61, y: 1.65, z: -71 }, type: 'knowledge', dataId: 'lesson8', name: 'DataBot' });
+      spawnNpc({ model: 'models/npcs/skeleton.gltf', scale: 0.4, pos: { x: 35, y: 1.6, z: 2 }, type: 'knowledge', dataId: 'lesson6', name: 'BitBot' });
+      spawnNpc({ model: 'models/npcs/stalker.gltf', scale: 0.4, pos: { x: 65, y: 1.55, z: 5 }, type: 'knowledge', dataId: 'lesson7', name: 'MinerMike' });
+      spawnNpc({ model: 'models/npcs/ripper-boss.gltf', scale: 0.4, pos: { x: -10, y: 1.8, z: 12 }, type: 'knowledge', dataId: 'lesson1', name: 'WalletWendy' });
+      spawnNpc({ model: 'models/players/robot1.gltf', scale: 1, pos: { x: 10, y: 1.65, z: -15 }, type: 'knowledge', dataId: 'lesson3', name: 'KeyKeeper' });
+      spawnNpc({ model: 'models/players/player-with-gun.gltf', scale: 0.4, pos: { x: -10, y: 1.55, z: -10 }, type: 'knowledge', dataId: 'lesson2', name: 'AltcoinAlice' });
+      spawnNpc({ model: 'models/npcs/zombie.gltf', scale: 0.4, pos: { x: 3, y: 1.55, z: 73 }, type: 'knowledge', dataId: 'lesson5', name: 'RiskyRick' });*/
   } catch (error) { console.error("Error during initial NPC spawning:", error); }
 
   // --- Player Join Logic ---
@@ -486,7 +495,9 @@ startServer(async world => {
 
     // Load Mobile Controls UI
     player.ui.load('ui/game-ui.html'); // Load consolidated game UI
-    world.chatManager.sendPlayerMessage(player, 'Welcome to the Bitcoin Learning Game!', '00FF00');
+    world.chatManager.sendPlayerMessage(player, 'Welcome to Hermit Online!', '00FF00');
+    world.chatManager.sendPlayerMessage(player, 'Let\'s begin with some Bitcoin lessons.', '00FF00');
+    world.chatManager.sendPlayerMessage(player, 'This game is built for mobile browser, but desktop is still working, but not optimized:', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'Use WASD to move around.');
     world.chatManager.sendPlayerMessage(player, 'Press space to jump.');
     world.chatManager.sendPlayerMessage(player, 'Hold shift to sprint.');
