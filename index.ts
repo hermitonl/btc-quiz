@@ -43,19 +43,43 @@ const QUIZ_ZONE_MAX = new Vector3( 6, 5, 13);  // Max coords for players to be i
 
 // --- Lesson & Quiz Data ---
 const lessons: Lesson[] = [
-    { id: 'lesson0', npcName: 'InfoBot00', text: 'Welcome to Hermit Online!', reward: 1 },
-    { id: 'lesson1', npcName: 'InfoBot01', text: 'Bitcoin is a decentralized digital currency.', reward: 1 },
-    { id: 'lesson2', npcName: 'InfoBot02', text: 'Transactions are recorded on a public ledger called the blockchain.', reward: 1 },
-    { id: 'lesson3', npcName: 'InfoBot03', text: 'New bitcoins are created through mining.', reward: 1 },
-    { id: 'lesson4', npcName: 'InfoBot04', text: 'Bitcoin mining difficulty adjusts automatically to keep block creation time around 10 minutes.', reward: 1 },
-    { id: 'lesson5', npcName: 'InfoBot05', text: 'A Bitcoin wallet stores your private keys, allowing you to send and receive bitcoins.', reward: 1 },
-    { id: 'lesson6', npcName: 'InfoBot06', text: 'Your public key is like your bank account number (shareable), while your private key is like your password (keep secret!).', reward: 1 },
-    { id: 'lesson7', npcName: 'InfoBot07', text: 'Altcoins are cryptocurrencies other than Bitcoin, like Ethereum or Solana.', reward: 1 },
-    { id: 'lesson8', npcName: 'InfoBot08', text: 'Cryptocurrencies can be volatile and risky investments. Never invest more than you can afford to lose.', reward: 1 },
+    { id: 'lesson0', npcName: 'InfoBot00', text: 'Hi Humanoid! Welcome to Hermit Online! We will explore about Bitcoin. Ready to start?', reward: 1 },
+    { id: 'lesson1', npcName: 'InfoBot01', text: 'Meet Kai. He lives in RobotHell, where prices of everyday goods rise rapidly. His hard-earned money buys less and less each month.', reward: 1 },
+    { id: 'lesson2', npcName: 'InfoBot02', text: 'Money is a tool we use to exchange value. It has three key functions. \n\nStore of Value: Money should keep its value over time, so you can save and use it later. \n\nMedium of Exchange: Money lets people trade goods and services without bartering. \n\nUnit of Account: Money provides a standard way to measure the value of goods and services.', reward: 1 },
+    { id: 'lesson3', npcName: 'InfoBot03', text: 'What makes good money? \n- Scarcity: Money must be limited in supply. \n- Durability: Money must last over time. \n- Divisibility: Money should be easy to divide. \n- Portability: Good money is easy to carry. \n- Fungibility: Every unit of money should be identical.', reward: 1 },
+    { id: 'lesson4', npcName: 'InfoBot04', text: 'Gold: Scarce and durable, but not very portable or divisible. Carrying gold for small purchases is impractical. \n\nFiat money (dollars, euros, bolívares): Portable and divisible, but not scarce, governments print more, causing inflation. \n\nKai is frustrated. Every time he saves money, it buys him less over time. He wonders: is there a better kind of money?', reward: 1 },
+    { id: 'lesson5', npcName: 'InfoBot05', text: 'Bitcoin is revolutionary form of decentralized digital money that no one can control or manipulate (neither government, bank, nor company). \n\nBitcoin has a fixed supply of 21 million coins. No one can create more, making it scarce! \n\nBitcoin is created through mining. Powerful computers solve complex puzzles to secure the network, and miners earn new Bitcoin as a reward (like lottery).', reward: 1 },
+    { id: 'lesson6', npcName: 'InfoBot06', text: 'Why Bitcoin is better than fiat money? \n\nLimited Supply: Unlike fiat, Bitcoin supply is capped at 21 million. \n\nBorderless: You can send Bitcoin instantly, anywhere in the world, without needing banks. \n\nPermissionless: No one can block your transactions or stop you. \n\nTransparent & Secure: All Bitcoin transactions are permanent and visible on a public blockchain ledger that anyone can verify, no one can fake it!', reward: 1 },
+    { id: 'lesson7', npcName: 'InfoBot07', text: 'Kai has saved some Bitcoin. But can he actually use it to buy things? \n\nYes! Bitcoin is not just for saving, it can be used like cash to buy goods and services worldwide! \n\nThe Lightning Network is a second-layer solution that makes Bitcoin fast and cheap for everyday payments. \n\nLightning works by creating off-chain payment channels between users. Transactions inside these channels are instant and nearly free!', reward: 1 },
+    { id: 'lesson8', npcName: 'InfoBot08', text: 'Did you know? Some businesses already accept Bitcoin over Lightning, including online shops, restaurants, freelance services, gaming platforms and even AI agents! \n\nTo pay with Lightning, you need a Lightning wallet. Wallets like Breez, Phoenix, and Muun make it super easy! Since Bitcoin is global, Lightning allows anyone, anywhere to receive payments without relying on banks!', reward: 1 },
 ];
 const quizzes: Quiz[] = [
     {
-        id: 'quiz1', npcName: 'QuizMind', topic: 'Bitcoin Basics', cost: 1, reward: 10,
+        id: 'quiz1', npcName: 'QuizMind', topic: 'Money', cost: 1, reward: 10,
+        questions: [
+            { q: 'Which of these is NOT a function of money?', a: ['Store of Value', 'Medium of Exchange', 'Unit of Weight', 'Unit of Account'], correct: 'Unit of Weight' },
+            { q: 'Which of these is an essential property of good money?', a: ['Popularity', 'Tastiness', 'Shininess', 'Scarcity'], correct: 'Scarcity' },
+            { q: 'Why fiat (dollars, euros, bolívares) is not a sound money?', a: ['Governments can always print more!', 'Not portable (easy to carry)', 'Not divisible (can split easily it into small parts)', 'Not durable, cannot last over time. '], correct: 'Governments can always print more!' }
+        ]
+    },
+    {
+        id: 'quiz2', npcName: 'QuizMind', topic: 'Bitcoin', cost: 1, reward: 10,
+        questions: [
+            { q: 'Why is Bitcoin scarce?', a: ['Because banks issue it carefully', 'Because governments limit how much is made', 'Because it has a fixed supply of 21 million', 'Because people lose their Bitcoin'], correct: 'Because it has a fixed supply of 21 million' },
+            { q: 'Which money is easiest to transport globally?', a: ['Gold', 'US Dollar', 'Chinese Yuan', 'Bitcoin'], correct: 'Bitcoin' },
+            { q: 'Who controls Bitcoin?', a: ['Governments', 'No one, it is decentralized', 'Banks', 'Miners'], correct: 'No one, it is decentralized' }
+        ]
+    },
+    {
+        id: 'quiz3', npcName: 'QuizMind', topic: 'Lightning', cost: 1, reward: 10,
+        questions: [
+            { q: 'Why is Lightning better for small payments?', a: ['It is slower but more secure', 'It helps governments control Bitcoin', 'Because Elon Musk said so', 'It makes transactions instant and cheap'], correct: 'It makes transactions instant and cheap' },
+            { q: 'What is a benefit of earning with Bitcoin on Lightning?', a: ['Fast and borderless payments', 'Refundable', 'Government approval required', 'Can do it without internet'], correct: 'Fast and borderless payments' },
+            { q: 'Which is not a Lightning use case?', a: ['Buying coffee in physical shop', 'Beaming money offline via Bluetooth', 'Freelancers getting paid in BTC', 'Tipping creators'], correct: 'Beaming money offline via Bluetooth' }
+        ]
+    },
+    {
+        id: 'quiz4', npcName: 'QuizMind', topic: 'Bitcoin Basics', cost: 1, reward: 10,
         questions: [
             { q: 'What is Bitcoin primarily known as?', a: ['A physical coin', 'A decentralized digital currency', 'A government-backed asset', 'A paper gold certificate'], correct: 'A decentralized digital currency' },
             { q: 'What is the maximum supply of Bitcoin?', a: ['100 Million', 'Unlimited', '21 Million', '100'], correct: '21 Million' },
@@ -63,7 +87,7 @@ const quizzes: Quiz[] = [
         ]
     },
     {
-        id: 'quiz2', npcName: 'QuizMind', topic: 'Blockchain Fundamentals', cost: 2, reward: 10,
+        id: 'quiz5', npcName: 'QuizMind', topic: 'Blockchain Fundamentals', cost: 1, reward: 10,
         questions: [
             { q: 'What is a block in a blockchain?', a: ['A type of cryptocurrency', 'A collection of transactions', 'A mining computer', 'A famous bitcoiner'], correct: 'A collection of transactions' },
             { q: 'How are blocks linked together?', a: ['Through cryptographic hashes', 'With physical chains', 'By email', 'SQL'], correct: 'Through cryptographic hashes' },
@@ -495,7 +519,7 @@ startServer(async world => {
 
     // Load Mobile Controls UI
     player.ui.load('ui/game-ui.html'); // Load consolidated game UI
-    world.chatManager.sendPlayerMessage(player, 'Welcome to Hermit Online!', '00FF00');
+    world.chatManager.sendPlayerMessage(player, 'Hi Humanoid! Welcome to Hermit Online!', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'Let\'s begin with some Bitcoin lessons.', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'This game is built for mobile browser, but desktop is still working, but not optimized:', '00FF00');
     world.chatManager.sendPlayerMessage(player, 'Use WASD to move around.');
