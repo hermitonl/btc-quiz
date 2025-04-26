@@ -33,6 +33,46 @@ OSS Example (3D Model): http://alicdn.hermit.onl/soldier-player.gltf
 *   **Content Delivery:** Alibaba Cloud Content Delivery Network (CDN)
 *   **Deployment:** Docker, Nginx (Reverse Proxy), Alibaba Cloud Elastic Compute Service (ECS), Alibaba Cloud ACR (Container Registry)
 
+## What I Built
+
+This project is a robot-themed MMORPG called [HermitONL (Hermit Online)](https://hytopia.com/play/?join=aliyun.hermit.onl), built using the HYTOPIA SDK. Players take on the role of a newly activated humanoid robot in a world dominated by fiat currency. The core objective is educational: players learn about Bitcoin concepts by interacting with NPC characters and test their knowledge through a "fall-down" style quiz game mechanic. The game features persistent player progression (tracking sats earned, lessons completed, etc.) and is deployed live on Alibaba Cloud infrastructure.
+
+## Alibaba Cloud Services Implementation
+
+Several Alibaba Cloud services were utilized to build, deploy, and host this game:
+
+*   **Elastic Compute Service (ECS):**
+    *   **Why:** Chosen to host the backend game server (running the Hytopia SDK via Bun/Node.js within a Docker container) and the Nginx reverse proxy.
+    *   **How:** A `ecs.t5-lc1m1.small` instance (1vCPU, 1GiB RAM) running Ubuntu 22.04 was provisioned in the Singapore region, leveraging the free tier. Nginx was installed to handle incoming web traffic and proxy requests to the game server container.
+    *   **Experience:** The free tier instance provided a cost-effective way to deploy. However, the limited memory (1GiB) proved insufficient for building the Docker image directly on the instance (specifically during the `bun install` step), leading to OOM errors (exit code 137). This necessitated using Alibaba Cloud ACR.
+
+*   **ApsaraDB RDS / PolarDB for PostgreSQL:**
+    *   **Why:** Selected for persistent storage of player data, including usernames, sat balances, completed lessons, and quiz results. Both RDS and PolarDB were explored; PolarDB offers cloud-native benefits like auto-scaling storage, while RDS provides a familiar managed PostgreSQL experience. The project currently uses the public endpoint from one of these services.
+    *   **How:** A PostgreSQL database (`kai_pdb_name`) and user (`kai_pdb_account`) were created. The application connects using credentials provided via environment variables (`PGHOST`, `PGPORT`, etc.). The `initializeDatabase` function in the code ensures the `players` table schema exists.
+    *   **Experience:** Setting up the database instance was straightforward. Initial connection and schema creation faced permission issues (`permission denied for schema public`), which were resolved by granting `USAGE` and `CREATE` privileges to the application user on the `public` schema via SQL commands.
+
+*   **Object Storage Service (OSS):**
+    *   **Why:** Used to host static game assets like 3D models (`.gltf`), UI icons (`.png`), and potentially other media efficiently and scalably.
+    *   **How:** An OSS bucket (`hermitonl`) was created in the Singapore region with Zone-Redundant Storage (ZRS) for higher availability. Specific assets (like `soldier-player.gltf` and UI icons) were uploaded. Bucket-level "Block Public Access" was disabled, and individual file ACLs were set to `Public Read` to allow access via CDN or direct URL.
+    *   **Experience:** Setup was relatively simple. Understanding the interaction between bucket-level "Block Public Access" and file-level ACLs was crucial for making assets publicly readable.
+
+*   **Content Delivery Network (CDN):**
+    *   **Why:** To accelerate the delivery of static assets (hosted on OSS) to players globally, reducing latency and load on the origin server.
+    *   **How:** A CDN domain (`alicdn.hermit.onl`) was configured, pointing to the OSS bucket (`hermitonl.oss-ap-southeast-1.aliyuncs.com`) as the origin server (using port 443 for secure origin fetch). DNS CNAME records were updated at the domain provider (Porkbun) to point `alicdn.hermit.onl` to the Alibaba Cloud CDN CNAME target. UI assets in HTML use a `{{CDN_ASSETS_URL}}` placeholder, replaced by an environment variable pointing to `http://alicdn.hermit.onl`.
+    *   **Experience:** The setup involved multiple steps (domain verification, origin config, CNAME). Troubleshooting involved verifying direct OSS access, checking DNS propagation, and confirming CDN domain status. HTTPS setup via CDN/ESA was explored but deferred due to perceived complexity/cost, settling on HTTP for asset delivery initially. The environment variable approach for integrating the CDN URL into the UI was identified as the likely intended method.
+
+*   **Container Registry (ACR):**
+    *   **Why:** Adopted to overcome the memory limitations of building the Docker image directly on the small ECS instance.
+    *   **How:** An ACR instance/namespace/repository was set up. The Docker image is now built locally, tagged with the ACR repository path, and pushed to ACR. The ECS instance then pulls the pre-built image from ACR for deployment.
+    *   **Experience:** This workflow effectively solved the OOM build errors on ECS and represents a more robust deployment strategy. It requires initial setup of ACR and authentication on both the build machine and the ECS instance.
+
+## Game Development Highlights
+
+*   **Persistence:** Successfully integrated PostgreSQL (via Alibaba Cloud PolarDB/RDS) to save and load player progress (sats, lessons, quizzes), making the game state persistent across sessions.
+*   **Quiz Mechanic:** Implemented the core "fall-down" quiz mechanic where players move to platforms corresponding to answers, with incorrect platforms disappearing.
+*   **Deployment Pipeline:** Established a full deployment pipeline involving Docker containerization, Nginx reverse proxying, HTTPS via Let's Encrypt, and leveraging Alibaba Cloud services (ECS, ACR, OSS, CDN, Database).
+*   **Troubleshooting:** Successfully diagnosed and resolved various deployment issues, including Docker build memory limits (using ACR), Nginx 502 errors (caused by application crashes), missing modules (due to `.gitignore`), and database permissions.
+*   **CDN Integration:** Configured OSS and CDN for asset delivery and identified the environment variable method for integrating asset URLs into the game's UI.
 ## Local Development Setup
 
 ### Prerequisites
@@ -160,3 +200,7 @@ This outlines the deployment process using Alibaba Cloud services.
     ```
 *   **Firewall/Security Group:** Ensure ports 22 (SSH), 80 (HTTP), and 443 (HTTPS) are open inbound on the ECS instance's security group.
 
+
+## Conclusion
+
+This Bitcoin Learning Game demonstrates the integration of the HYTOPIA SDK with various Alibaba Cloud services to create a persistent, deployed MMORPG experience. Players can currently learn about Bitcoin via NPCs and test their knowledge in a unique quiz format. Future development aims to expand interactivity with features like peer-to-peer sat transfers and an in-game shop. The project serves as both an educational tool about Bitcoin and a practical example of deploying a modern web game on cloud infrastructure.
