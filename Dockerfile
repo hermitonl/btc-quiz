@@ -29,13 +29,12 @@ WORKDIR /app
 COPY package.json bun.lock ./
 
 # Install project dependencies using Bun
+# Copy the rest of the application code BEFORE install
+COPY . .
+
+# Install project dependencies using Bun
+# This should now run postinstall scripts correctly, including mediasoup's
 RUN bun install --frozen-lockfile
-
-# Explicitly run mediasoup postinstall build script
-RUN cd node_modules/mediasoup && bun run postinstall
-
-# Copy the rest of the application code
-# COPY . . # Optional: Uncomment if you want the code baked into the image instead of using volume mount
 
 # Set the default command to bash for an interactive shell
 CMD ["bash"]
