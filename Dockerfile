@@ -31,6 +31,9 @@ COPY package.json bun.lock ./
 # Install project dependencies using Bun
 RUN bun install --frozen-lockfile
 
+# Explicitly run mediasoup postinstall build script
+RUN cd node_modules/mediasoup && bun run postinstall
+
 # Copy the rest of the application code
 # COPY . . # Optional: Uncomment if you want the code baked into the image instead of using volume mount
 
